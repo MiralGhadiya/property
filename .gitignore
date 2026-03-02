@@ -88,3 +88,6 @@ dist/
 # LLM / Cache
 # ======================
 .cache/
+
+/txt.txt
+txt.txt
