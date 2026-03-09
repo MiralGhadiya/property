@@ -52,9 +52,9 @@
    Create a `.env` file in the root directory and add the following:
    ```env
    root@desktopvaluation:/var/www/property# cat .env
-   DATABASE_URL=postgresql://postgres:admin@82.112.236.63/desktop_db
+   DATABASE_URL=postgresql://username:password@host/desktop_db
    REDIS_URL=redis://localhost:6379/0
-   JWT_SECRET_KEY=omnamahshivay
+   JWT_SECRET_KEY= *******
    ALGORITHM= "HS256"
    RAZORPAY_KEY_ID=rzp_teou******6KmZ
    RAZORPAY_KEY_SECRET=O6V******wW31ZTG

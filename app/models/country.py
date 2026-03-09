@@ -13,7 +13,6 @@ class Country(UUIDPrimaryKeyMixin, Base):
     __table_args__ = (
         UniqueConstraint("name", name="uq_country_name"),
         UniqueConstraint("country_code", name="uq_country_country_code"),
-        UniqueConstraint("dial_code", name="uq_country_dial_code"),
     )
     
     name = Column(String, nullable=False)
