@@ -1,8 +1,10 @@
 # app/routes/auth.py
 import os
 import secrets
+from sqlalchemy import desc
 from app.auth import pwd_context
 from sqlalchemy.orm import Session
+
 
 from google.oauth2 import id_token
 from google.auth.transport import requests
@@ -10,7 +12,7 @@ from google.auth.transport import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -27,10 +29,8 @@ from app import schemas
 
 from app.services import user_service, country_service, auth_service
 
-from app.models.staff import Staff
 from app.models import EmailVerificationToken, User, SubscriptionPlan, UserSubscription, PasswordResetToken
 
-from app.utils.response import APIResponse, success_response
 from app.utils.logger_config import app_logger as logger
 
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
@@ -207,7 +207,7 @@ def resend_verification_email(
         logger.exception("Failed to create email verification token")
         raise HTTPException(500, "Failed to resend verification email")
 
-    verify_link = f"http://localhost:8000/verify-email?token={raw_token}"
+    verify_link = f"{BASE_URL}/verify-email?token={raw_token}"
     send_verification_email(user.email, verify_link)
 
     logger.info(f"Verification email resent user_id={user.id}")
@@ -450,12 +450,17 @@ def get_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    active_sub = db.query(UserSubscription).filter(
-        UserSubscription.user_id == current_user.id,
-        UserSubscription.is_active == True,
-        UserSubscription.is_expired == False,
-        UserSubscription.payment_status == "PAID"
-    ).first()
+    latest_sub = (
+        db.query(UserSubscription)
+        .filter(
+            UserSubscription.user_id == current_user.id,
+            # UserSubscription.payment_status == "PAID",
+            UserSubscription.is_active == True,
+            UserSubscription.is_expired == False,
+        )
+        .order_by(desc(UserSubscription.start_date))   # latest purchased
+        .first()
+    )
 
     return {
         "id": current_user.id,
@@ -464,8 +469,9 @@ def get_profile(
         "mobile_number": current_user.mobile_number,
         "country": current_user.country.name if current_user.country else None,
         "role": current_user.role,
-        "subscription_id": active_sub.id if active_sub else None,
-        "has_active_subscription": bool(active_sub),
+        "subscription_id": latest_sub.id if latest_sub else None,
+        "plan_name": latest_sub.plan.name if latest_sub else None,
+        "has_active_subscription": bool(latest_sub),
     }
     
  

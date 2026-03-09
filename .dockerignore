@@ -1,0 +1,12 @@
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.git
+.gitignore
+generated_reports
+uploads
+*.zip
+celerybeat-schedule*

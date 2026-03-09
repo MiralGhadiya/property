@@ -173,12 +173,12 @@ def management_me(
         )
 
 
-@router.get("/me", response_model=APIResponse[AdminProfile])
-def admin_me(
-    current_admin: User = Depends(require_management),
-):
-    logger.debug(f"Admin profile fetched user_id={current_admin.id}")
-    return success_response(data=current_admin, message="Admin profile fetched successfully")
+# @router.get("/me", response_model=APIResponse[AdminProfile])
+# def admin_me(
+#     current_admin: User = Depends(require_management),
+# ):
+#     logger.debug(f"Admin profile fetched user_id={current_admin.id}")
+#     return success_response(data=current_admin, message="Admin profile fetched successfully")
 
 
 @router.post("/logout")

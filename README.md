@@ -51,16 +51,24 @@
 4. **Environment Configuration:**
    Create a `.env` file in the root directory and add the following:
    ```env
-   DATABASE_URL=postgresql://user:password@localhost/dbname
+   root@desktopvaluation:/var/www/property# cat .env
+   DATABASE_URL=postgresql://postgres:admin@82.112.236.63/desktop_db
    REDIS_URL=redis://localhost:6379/0
-   SECRET_KEY=your-secret-key
-   RAZORPAY_KEY_ID=your-key
-   RAZORPAY_KEY_SECRET=your-secret
-   OPENAI_API_KEY=your-key
+   JWT_SECRET_KEY=omnamahshivay
+   ALGORITHM= "HS256"
+   RAZORPAY_KEY_ID=rzp_teou******6KmZ
+   RAZORPAY_KEY_SECRET=O6V******wW31ZTG
+   OPENAI_API_KEY=sk
    SMTP_SERVER=smtp.gmail.com
    SMTP_PORT=587
-   SMTP_EMAIL=your-email
-   SMTP_PASSWORD=your-password
+   EMAIL_USER=miral.g.evenmore@gmail.com
+   EMAIL_PASSWORD=ekm******cuyfka
+   IPINFO_TOKEN=9a******c5bf7aa
+   BASE_URL=http://192.168.1.90
+   FRONTEND_URL=http://192.168.1.73:5173
+   EXCHANGE_RATE_API_KEY=5cc66********aa6744
+   GOOGLE_MAPS_API_KEY="AIzaSyB6UWT********_Gh4JgBsIYkg"
+   GOOGLE_CLIENT_ID=339380282766-******.com
    ```
 
 5. **Run Database Migrations:**

@@ -1,12 +1,18 @@
 # app/celery_app.py
 
+import os
+from dotenv import load_dotenv
 from celery import Celery
 from celery.schedules import crontab
 
+load_dotenv()
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+
 celery_app = Celery(
     "app",
-    broker="redis://127.0.0.1:6379/0",
-    backend="redis://127.0.0.1:6379/1",
+    broker=REDIS_URL,
+    backend=REDIS_URL,
 )
 
 celery_app.conf.update(
@@ -37,9 +43,4 @@ celery_app.conf.beat_schedule = {
         "task": "app.tasks.currency_tasks.update_exchange_rates",
         "schedule": crontab(hour=0, minute=0),
     },
-    
-    # "update-exchange-rates": {
-    #     "task": "app.tasks.currency_tasks.update_exchange_rates",
-    #     "schedule": crontab(minute="*"),  # runs every minute
-    # }
 }

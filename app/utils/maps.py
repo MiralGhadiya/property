@@ -1,8 +1,11 @@
 # app/utils/maps.py
 
+import base64
 import os
 import random
 import requests
+
+from logger_config import app_logger as logger
 
 GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 
@@ -73,14 +76,27 @@ def get_place_photo(address: str):
         return None
 
     photo = random.choice(photos)
+    logger.info(f"Selected photo reference: {photo['photo_reference']} for address: {address}")
+    
     ref = photo["photo_reference"]
+    logger.info(f"Fetching photo for reference: {ref}")
 
-    return (
+    url = (
         "https://maps.googleapis.com/maps/api/place/photo"
         f"?maxwidth=600"
         f"&photo_reference={ref}"
         f"&key={GOOGLE_MAPS_KEY}"
     )
+    logger.info(f"Constructed photo URL: {url}")
+
+    r = requests.get(url, allow_redirects=True, timeout=10)
+
+    if r.status_code != 200:
+        return None
+
+    image_base64 = base64.b64encode(r.content).decode()
+
+    return f"data:image/jpeg;base64,{image_base64}"
         
     
 def get_streetview_metadata(lat, lng):
@@ -92,6 +108,7 @@ def get_streetview_metadata(lat, lng):
         "source": "outdoor",
         "key": GOOGLE_MAPS_KEY
     }
+    
 
     r = requests.get(url, params=params, timeout=10)
     data = r.json()
