@@ -34,7 +34,7 @@
 1. **Clone the repository:**
    ```bash
    git clone <repository>
-   cd desktop_valuation-miral
+   cd property-main
    ```
 
 2. **Create and activate a virtual environment:**
@@ -86,23 +86,24 @@
 
 Open separate terminals to run the various components of the architecture:
 
-1. **Start the FastAPI server:**
-   ```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-   ```
 
-2. **Start the Celery worker (for background tasks like valuations and emails):**
+1. **Start the Celery worker (for background tasks like valuations and emails):**
    ```bash
    celery -A app.celery_app worker -l info
    ```
 
-3. **Start the Celery Beat scheduler (for subscriptions expiry and daily exchange rates):**
+2. **Start the Celery Beat scheduler (for subscriptions expiry and daily exchange rates):**
    ```bash
    celery -A app.celery_app beat -l info
    ```
+
+3. **Start the FastAPI server:**
+   ```bash
+   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
 
 ## Documentation
 - Detailed API Specs: see `API_DOCUMENTATION.md`
 - Architecture & Models: see `PROJECT_ARCHITECTURE.md`
 - Application Workflows: see `FLOW_DOCUMENTATION.md` and `PROJECT_FLOW_DOCUMENTATION.md`
-

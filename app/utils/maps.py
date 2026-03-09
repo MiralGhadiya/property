@@ -5,7 +5,7 @@ import os
 import random
 import requests
 
-from logger_config import app_logger as logger
+from app.utils.logger_config import app_logger as logger
 
 GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 
