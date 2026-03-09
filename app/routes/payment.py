@@ -207,7 +207,7 @@ def verify_payment(
         now = datetime.now(timezone.utc)
 
         # ✅ Expire old subscriptions
-        _expire_existing_active_subs(db, current_user.id, now)
+        # _expire_existing_active_subs(db, current_user.id, now)
 
         # ✅ ACTIVATE THIS SUBSCRIPTION
         sub.razorpay_payment_id = data["razorpay_payment_id"]
