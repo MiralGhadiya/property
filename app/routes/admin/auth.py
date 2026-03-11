@@ -1,6 +1,6 @@
 #app/routes/admin/auth.py
 
-from uuid import UUID
+from typing import Union
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -95,7 +95,6 @@ def management_login(
             message="Admin login successful"
         )
 
-    # 2️⃣ Check Staff
     staff = db.query(Staff).filter(
         Staff.email == data.email
     ).first()
@@ -124,6 +123,7 @@ def management_login(
                         "can_access_dashboard": staff.can_access_dashboard,
                         "can_access_reports": staff.can_access_reports,
                         "can_access_subscriptions_plans": staff.can_access_subscriptions_plans,
+                        "can_access_config": staff.can_access_config,
                     }
                 }
             },
@@ -135,38 +135,37 @@ def management_login(
 
 @router.get("/management/me")
 def management_me(
-    current = Depends(require_management),
+    current: Union[User, Staff] = Depends(require_management),
 ):
 
-    if current["type"] == "admin":
-        admin = current["data"]
+    if isinstance(current, User):
 
         return success_response(
             data={
                 "type": "admin",
-                "id": admin.id,
-                "email": admin.email,
-                "username": admin.username,
+                "id": current.id,
+                "email": current.email,
+                "username": current.username,
             },
             message="Admin profile fetched successfully"
         )
 
-    if current["type"] == "staff":
-        staff = current["data"]
+    if isinstance(current, Staff):
 
         return success_response(
             data={
                 "type": "staff",
-                "id": staff.id,
-                "name": staff.name,
-                "email": staff.email,
-                "role": staff.role,
+                "id": current.id,
+                "name": current.name,
+                "email": current.email,
+                "role": current.role,
                 "accesses": {
-                    "can_access_user": staff.can_access_user,
-                    "can_access_staff": staff.can_access_staff,
-                    "can_access_dashboard": staff.can_access_dashboard,
-                    "can_access_reports": staff.can_access_reports,
-                    "can_access_subscriptions_plans": staff.can_access_subscriptions_plans,
+                    "can_access_user": current.can_access_user,
+                    "can_access_staff": current.can_access_staff,
+                    "can_access_dashboard": current.can_access_dashboard,
+                    "can_access_reports": current.can_access_reports,
+                    "can_access_subscriptions_plans": current.can_access_subscriptions_plans,
+                    "can_access_config": current.can_access_config,
                 }
             },
             message="Staff profile fetched successfully"

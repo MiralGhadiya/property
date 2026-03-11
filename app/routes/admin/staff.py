@@ -12,7 +12,7 @@ from app.common import PaginatedResponse
 
 from app.database.db import get_db
 from app.utils.response import APIResponse, success_response
-from app.deps import pagination_params, require_superuser, require_management
+from app.deps import pagination_params, require_management
 
 router = APIRouter(prefix="/admin/staff", tags=["admin-staff"])
 
@@ -24,6 +24,7 @@ def build_accesses(staff: Staff) -> dict:
         "can_access_dashboard": staff.can_access_dashboard,
         "can_access_reports": staff.can_access_reports,
         "can_access_subscriptions_plans": staff.can_access_subscriptions_plans,
+        "can_access_config": staff.can_access_config,
     }
 
 
@@ -55,6 +56,7 @@ def create_staff(
         can_access_dashboard=staff.can_access_dashboard,
         can_access_reports=staff.can_access_reports,
         can_access_subscriptions_plans=staff.can_access_subscriptions_plans,
+        can_access_config=staff.can_access_config,   
     )
 
     db.add(new_staff)
@@ -170,6 +172,8 @@ def update_staff(
         staff_member.can_access_reports = staff_update.can_access_reports
     if staff_update.can_access_subscriptions_plans is not None:
         staff_member.can_access_subscriptions_plans = staff_update.can_access_subscriptions_plans
+    if staff_update.can_access_config is not None:
+        staff_member.can_access_config = staff_update.can_access_config
 
     db.commit()
     db.refresh(staff_member)

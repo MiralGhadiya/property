@@ -37,8 +37,8 @@ def get_admin_feedback_emails():
     return get_config("ADMIN_FEEDBACK_EMAILS", "").split(",")
 SMTP_URL = "smtp.gmail.com"
 
-if not get_email_user() or not get_email_password():
-    logger.error("EMAIL_USER or EMAIL_PASSWORD not configured")
+# if not get_email_user() or not get_email_password():
+#     logger.error("EMAIL_USER or EMAIL_PASSWORD not configured")
     
     
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates" / "emails"

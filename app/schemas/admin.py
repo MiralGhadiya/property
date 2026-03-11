@@ -97,3 +97,24 @@ class CountryResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        
+        
+class SystemConfigCreate(BaseModel):
+    config_key: str
+    config_value: Optional[str]
+    description: Optional[str]
+
+
+class SystemConfigUpdate(BaseModel):
+    config_value: Optional[str]
+    description: Optional[str]
+
+
+class SystemConfigResponse(BaseModel):
+    id: UUID
+    config_key: str
+    config_value: Optional[str]
+    description: Optional[str]
+
+    class Config:
+        from_attributes = True

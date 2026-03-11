@@ -40,6 +40,8 @@ import app.models.subscription
 import app.models.user
 import app.models.valuation
 
+import app.models
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.

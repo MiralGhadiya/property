@@ -1,3 +1,5 @@
+# app/auth.py
+
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
@@ -65,6 +67,9 @@ def create_refresh_token(data: dict):
 
 
 def decode_token(token: str):
+    if not token:
+        return None
+    
     try:
         secret = get_secret_key()
         algorithm = get_algorithm()
