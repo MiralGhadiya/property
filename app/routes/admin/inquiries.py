@@ -6,7 +6,7 @@ from sqlalchemy import or_
 from fastapi import APIRouter, Depends, Query, HTTPException
 from datetime import datetime
 
-from app.deps import get_db, require_superuser, pagination_params, require_management
+from app.deps import get_db, pagination_params, require_management
 from app.models.inquiry import Inquiry
 from app.models import User
 from app.schemas.admin import AdminInquiryResponse
@@ -43,9 +43,6 @@ def list_inquiries(
 ):
     query = db.query(Inquiry)
 
-    # =========================
-    # 🔎 SEARCH
-    # =========================
     if params["search"]:
         search_term = f"%{params['search']}%"
         query = query.filter(
@@ -58,20 +55,9 @@ def list_inquiries(
             )
         )
 
-    # =========================
-    # 🎯 FILTERS
-    # =========================
     if type:
         query = query.filter(Inquiry.type == type)
 
-    # if subscribe_newsletter is not None:
-    #     query = query.filter(
-    #         Inquiry.subscribe_newsletter == subscribe_newsletter
-    #     )
-
-    # =========================
-    # 📅 DATE FILTER
-    # =========================
     query = filter_by_date_range(
         query,
         Inquiry.created_at,
@@ -81,9 +67,6 @@ def list_inquiries(
 
     total = query.count()
 
-    # =========================
-    # 🔃 SORTING (SAFE)
-    # =========================
     ALLOWED_SORT_FIELDS = {
         "created_at": Inquiry.created_at,
         "first_name": Inquiry.first_name,
@@ -101,12 +84,11 @@ def list_inquiries(
     else:
         query = query.order_by(sort_column.desc())
 
-    inquiries = (
-        query
-        .offset((params["page"] - 1) * params["limit"])
-        .limit(params["limit"])
-        .all()
-    )
+    # apply pagination only when a limit is provided; otherwise return all results
+    if params["limit"] is not None:
+        query = query.offset((params["page"] - 1) * params["limit"])\
+                     .limit(params["limit"])
+    inquiries = query.all()
 
     return success_response(
         data={

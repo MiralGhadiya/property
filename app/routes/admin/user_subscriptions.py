@@ -155,13 +155,16 @@ def list_all_user_subscriptions(
         
     total = query.count()
 
-    subs = (
-        query
-        .order_by(UserSubscription.start_date.desc())
-        .offset((params["page"] - 1) * params["limit"])
-        .limit(params["limit"])
-        .all()
-    )
+    if params["limit"] is not None:
+        subs = (
+            query
+            .order_by(UserSubscription.start_date.desc())
+            .offset((params["page"] - 1) * params["limit"])
+            .limit(params["limit"])
+            .all()
+        )
+    else:
+        subs = query.order_by(UserSubscription.start_date.desc()).all()
     
     logger.debug(f"Admin fetched user subscriptions count={len(subs)}")
 
@@ -256,13 +259,16 @@ def get_user_subscriptions(
     
     total = query.count()
 
-    subs = (
+    if params["limit"] is not None:
+        subs = (
             query
             .order_by(UserSubscription.start_date.desc())
             .offset((params["page"] - 1) * params["limit"])
             .limit(params["limit"])
             .all()
         )
+    else:
+        subs = query.order_by(UserSubscription.start_date.desc()).all()
     
     logger.debug(
         f"Admin fetched subscriptions for user_id={user_id} count={len(subs)}"

@@ -105,12 +105,15 @@ def list_valuations(
         raise HTTPException(400, "Invalid sort order")
 
     # 📄 PAGINATION
-    valuations = (
-        query
-        .offset((params["page"] - 1) * params["limit"])
-        .limit(params["limit"])
-        .all()
-    )
+    if params["limit"] is not None:
+        valuations = (
+            query
+            .offset((params["page"] - 1) * params["limit"])
+            .limit(params["limit"])
+            .all()
+        )
+    else:
+        valuations = query.all()
 
     logger.debug(
         f"Admin fetched valuations count={len(valuations)} total={total}"
@@ -182,13 +185,16 @@ def get_user_valuations(
 
     total = query.count()
 
-    valuations = (
-        query
-        .order_by(ValuationReport.created_at.desc())
-        .offset((params["page"] - 1) * params["limit"])
-        .limit(params["limit"])
-        .all()
-    )
+    if params["limit"] is not None:
+        valuations = (
+            query
+            .order_by(ValuationReport.created_at.desc())
+            .offset((params["page"] - 1) * params["limit"])
+            .limit(params["limit"])
+            .all()
+        )
+    else:
+        valuations = query.order_by(ValuationReport.created_at.desc()).all()
 
     return success_response(
         data={
