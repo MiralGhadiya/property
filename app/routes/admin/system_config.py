@@ -13,8 +13,8 @@ from app.schemas.admin import (
     SystemConfigUpdate,
     SystemConfigResponse,
 )
-
-from app.utils.response import APIResponse, success_response
+                 
+from app.utils.response import APIResponse, success_4response
 from app.common import PaginatedResponse
 from app.deps import pagination_params
 

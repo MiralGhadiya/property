@@ -78,13 +78,17 @@ def list_feedback(
 
     total = query.count()
 
-    feedbacks = (
-        query
-        .order_by(Feedback.created_at.desc())
-        .offset((params["page"] - 1) * params["limit"])
-        .limit(params["limit"])
-        .all()
-    )
+    # apply pagination safely
+    if params["limit"] is not None:
+        feedbacks = (
+            query
+            .order_by(Feedback.created_at.desc())
+            .offset((params["page"] - 1) * params["limit"])
+            .limit(params["limit"])
+            .all()
+        )
+    else:
+        feedbacks = query.order_by(Feedback.created_at.desc()).all()
 
     logger.debug(
         f"Admin fetched feedback count={len(feedbacks)} total={total}"
