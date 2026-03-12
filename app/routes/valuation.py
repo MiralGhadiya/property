@@ -168,12 +168,11 @@ def my_valuations(
 
     total = query.count()
 
-    records = (
-        query.order_by(ValuationReport.created_at.desc())
-        .offset((params["page"] - 1) * params["limit"])
-        .limit(params["limit"])
-        .all()
-    )
+    query = query.order_by(ValuationReport.created_at.desc())
+    if params["limit"] is not None:
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+    
+    records = query.all()
 
     return {
         "data": [

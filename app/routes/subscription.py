@@ -218,13 +218,11 @@ def subscription_history(
 
     total = query.count()
 
-    subs = (
-        query
-        .order_by(UserSubscription.start_date.desc())
-        .offset((params["page"] - 1) * params["limit"])
-        .limit(params["limit"])
-        .all()
-    )
+    query = query.order_by(UserSubscription.start_date.desc())
+    if params["limit"] is not None:
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+    
+    subs = query.all()
 
     now = datetime.now(timezone.utc)
 

@@ -21,6 +21,7 @@ class Staff(Base):
     can_access_dashboard = Column(Boolean, default=False)  # Dashboard Access
     can_access_reports = Column(Boolean, default=False)  # Reports Access
     can_access_subscriptions_plans = Column(Boolean, default=False)  # Subscriptions & Plans Access
+    can_access_config = Column(Boolean, default=False)
 
     # Relationship with user table if needed
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))

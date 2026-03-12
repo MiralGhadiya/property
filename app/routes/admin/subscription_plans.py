@@ -129,13 +129,11 @@ def list_subscription_plans(
 
     total = query.count()
 
-    plans = (
-        query
-        .order_by(SubscriptionPlan.id.desc())
-        .offset((params["page"] - 1) * params["limit"])
-        .limit(params["limit"])
-        .all()
-    )
+    query = query.order_by(SubscriptionPlan.id.desc())
+    if params["limit"] is not None:
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+    
+    plans = query.all()
 
     logger.debug(f"Admin subscription plans fetched count={len(plans)}")
 

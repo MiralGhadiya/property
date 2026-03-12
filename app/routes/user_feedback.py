@@ -99,13 +99,11 @@ def my_feedback(
 
     total = query.count()
 
-    feedbacks = (
-        query
-        .order_by(Feedback.created_at.desc())
-        .offset((params["page"] - 1) * params["limit"])
-        .limit(params["limit"])
-        .all()
-    )
+    query = query.order_by(Feedback.created_at.desc())
+    if params["limit"] is not None:
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+    
+    feedbacks = query.all()
 
     return {
         "data": feedbacks,

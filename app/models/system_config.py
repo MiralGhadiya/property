@@ -18,6 +18,5 @@ class SystemConfig(UUIDPrimaryKeyMixin, Base):
     config_key = Column(String(150), nullable=False, unique=True, index=True)
     config_value = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
-    is_secret = Column(Boolean, default=False)
 
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

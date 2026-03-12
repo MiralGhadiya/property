@@ -20,6 +20,13 @@ def require_management(
     token: str = Depends(oauth2_scheme),
     db: Session = Depends(get_db),
 ):
+    
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization token missing"
+        )
+
     payload = decode_token(token)
 
     if not payload or payload.get("type") != "access":
@@ -45,7 +52,7 @@ def require_management(
         if not admin:
             raise HTTPException(status_code=404, detail="Admin not found")
 
-        return {"type": "admin", "data": admin}
+        return admin
 
     if role == "staff":
         staff = db.query(Staff).filter(
@@ -55,7 +62,7 @@ def require_management(
         if not staff:
             raise HTTPException(status_code=404, detail="Staff not found")
 
-        return {"type": "staff", "data": staff}
+        return staff
 
     raise HTTPException(status_code=403, detail="Invalid role")
 
@@ -134,7 +141,7 @@ def require_superuser(
 
 def pagination_params(
     page: int = Query(1, ge=1),
-    limit: int = Query(10, ge=1, le=100),
+    limit: int | None = Query(None),
     search: str | None = Query(None),
     is_active: bool | None = Query(None),
 ):

@@ -80,6 +80,10 @@
    ```bash
    python app/scripts/setup_project.py
    ```
+   **or**
+   ```bash
+   python -m app.scripts.setup_project
+   ```
 
 ## What the Setup Script Does
 

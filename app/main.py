@@ -16,7 +16,8 @@ from app.routes.admin import (
     feedback,
     staff,
     inquiries,
-    country
+    country,
+    system_config,
 )
 
 import app.celery_app
@@ -38,7 +39,7 @@ app = FastAPI(title="Desktop Valuation API")
 def startup_event():
     logger.info("Loading system configuration from database...")
     load_config()
-    auto_reload(30) 
+    auto_reload(10) 
     logger.info("System configuration loaded")
 
 app.add_middleware(IPCountryMiddleware)
@@ -86,6 +87,7 @@ app.include_router(feedback.router)
 app.include_router(staff.router)
 app.include_router(inquiries.router)
 app.include_router(country.router)
+app.include_router(system_config.router)
 
 # --------------------------------------------------
 # IP → Country middleware

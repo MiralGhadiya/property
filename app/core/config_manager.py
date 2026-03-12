@@ -41,9 +41,11 @@ def check_for_updates():
     db: Session = SessionLocal()
 
     try:
-        latest = db.query(SystemConfig).order_by(SystemConfig.updated_at.desc()).first()
+        latest = db.query(SystemConfig)\
+                   .order_by(SystemConfig.updated_at.desc())\
+                   .first()
 
-        if latest and latest.updated_at != _last_updated:
+        if latest and (_last_updated is None or latest.updated_at > _last_updated):
             logger.info("Config change detected. Reloading...")
             load_config()
 
@@ -55,8 +57,11 @@ def auto_reload(interval=10):
     """
     Check DB every X seconds for config updates
     """
+    
+    logger.info(f"Starting config auto-reload every {interval} seconds")
 
     def watcher():
+        logger.info("Config watcher thread started")
         while True:
             try:
                 check_for_updates()

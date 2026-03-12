@@ -21,6 +21,7 @@ class StaffCreate(StaffBase):
     can_access_dashboard: bool = False
     can_access_reports: bool = False
     can_access_subscriptions_plans: bool = False
+    can_access_config: bool = False
 
 
 class StaffUpdate(BaseModel):
@@ -34,6 +35,7 @@ class StaffUpdate(BaseModel):
     can_access_dashboard: Optional[bool] = None
     can_access_reports: Optional[bool] = None
     can_access_subscriptions_plans: Optional[bool] = None
+    can_access_config: Optional[bool] = None
 
 
 class StaffResponse(BaseModel):

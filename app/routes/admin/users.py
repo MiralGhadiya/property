@@ -127,12 +127,10 @@ def list_users(
     else:
         query = query.order_by(sort_column.desc())
 
-    users = (
-        query
-        .offset((params["page"] - 1) * params["limit"])
-        .limit(params["limit"])
-        .all()
-    )
+    if params["limit"] is not None:
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+    
+    users = query.all()
 
     logger.debug(
         f"Admin fetched users count={len(users)} total={total}"
