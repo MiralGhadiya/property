@@ -194,7 +194,7 @@ def send_pdf_email(
             Please find attached your Desktop Valuation Report.
 
             Best regards,
-            Valuation Team
+            Desktop Valuation Team
         """
 
         # ---- HTML ----
