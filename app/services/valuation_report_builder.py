@@ -38,14 +38,14 @@ def _build_property_details(user_input, ai_json, construction_year, property_age
             property_age,
             ai_json["property_details"].get("age_years")
         ),
-        "last_sale_date": _get_value_or_fallback(
-            user_input.get("last_sale_date"),
-            ai_json["property_details"].get("last_sale_date")
-        ),
-        "last_sale_price": _get_value_or_fallback(
-            user_input.get("last_sale_price"),
-            ai_json["property_details"].get("last_sale_price")
-        ),
+        # "last_sale_date": _get_value_or_fallback(
+        #     user_input.get("last_sale_date"),
+        #     ai_json["property_details"].get("last_sale_date")
+        # ),
+        # "last_sale_price": _get_value_or_fallback(
+        #     user_input.get("last_sale_price"),
+        #     ai_json["property_details"].get("last_sale_price")
+        # ),
         "ownership_type": _get_value_or_fallback(
             user_input.get("ownership_type"),
             ai_json["property_details"].get("ownership_type")

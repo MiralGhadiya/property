@@ -1,13 +1,12 @@
 #app/routes/admin/subscription_plans.py
 
-import pandas as pd
 from uuid import UUID
 from typing import Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 
-from app.deps import get_db, require_superuser, require_management
+from app.deps import get_db, require_management
 from app.models.subscription import SubscriptionPlan
 from app.schemas import SubscriptionPlanResponse, SubscriptionPlanCreate, SubscriptionPlanUpdate
 from app.services.subscription_service import add_subscription_plans_from_excel
@@ -129,7 +128,7 @@ def list_subscription_plans(
 
     total = query.count()
 
-    query = query.order_by(SubscriptionPlan.id.desc())
+    query = query.order_by(SubscriptionPlan.country_code.asc())
     if params["limit"] is not None:
         query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
     

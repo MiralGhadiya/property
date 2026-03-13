@@ -3,7 +3,7 @@
 from sqlalchemy import DateTime
 from datetime import datetime
 
-from sqlalchemy import Column, String, Text, Boolean, UniqueConstraint
+from sqlalchemy import Column, String, Text, UniqueConstraint
 from app.database.mixins import UUIDPrimaryKeyMixin
 from app.database.db import Base
 
