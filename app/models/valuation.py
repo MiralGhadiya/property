@@ -56,8 +56,8 @@ class DesktopValuationForm(BaseModel):
     built_up_area: Optional[str] = None
     year_built: Optional[str] = None
     
-    last_sale_date: Optional[str] = None
-    last_sale_price: Optional[str] = None
+    # last_sale_date: Optional[str] = None
+    # last_sale_price: Optional[str] = None
     ownership_type: Optional[str] = None
 
     configuration: Optional[str] = None
@@ -80,8 +80,8 @@ def desktop_valuation_form_dep(
     land_area: str = Form(None),
     built_up_area: Optional[str] = Form(None),
     year_built: Optional[str] = Form(None),
-    last_sale_date: Optional[str] = Form(None),
-    last_sale_price: Optional[str] = Form(None),
+    # last_sale_date: Optional[str] = Form(None),
+    # last_sale_price: Optional[str] = Form(None),
     ownership_type: Optional[str] = Form(None),
     configuration: Optional[str] = Form(None),
     construction_status: Optional[str] = Form(None),
@@ -102,8 +102,8 @@ def desktop_valuation_form_dep(
         land_area=land_area,
         built_up_area=built_up_area,
         year_built=year_built,
-        last_sale_date=last_sale_date,
-        last_sale_price=last_sale_price,
+        # last_sale_date=last_sale_date,
+        # last_sale_price=last_sale_price,
         ownership_type=ownership_type,
         configuration=configuration,
         construction_status=construction_status,

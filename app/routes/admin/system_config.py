@@ -17,6 +17,7 @@ from app.schemas.admin import (
 from app.utils.response import APIResponse, success_response
 from app.common import PaginatedResponse
 from app.deps import pagination_params
+from app.core.config_manager import notify_config_update
 
 from app.utils.logger_config import app_logger as logger
 
@@ -48,6 +49,8 @@ def create_config(
     db.refresh(config)
 
     logger.info(f"Config created: {config.config_key}")
+    
+    notify_config_update()  
 
     return success_response(
         data=config,
@@ -132,6 +135,8 @@ def update_config(
     db.refresh(config)
 
     logger.info(f"Config updated: {config.config_key}")
+    
+    notify_config_update()
 
     return success_response(
         data=config,
@@ -154,6 +159,8 @@ def delete_config(
     db.commit()
 
     logger.info(f"Config deleted: {config.config_key}")
+    
+    notify_config_update()
 
     return success_response(
         data=True,

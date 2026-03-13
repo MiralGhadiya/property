@@ -5,69 +5,117 @@ from threading import Thread
 from sqlalchemy.orm import Session
 
 from app.database.db import SessionLocal
+from app.core.redis_client import redis_client
 from app.models.system_config import SystemConfig
 from app.utils.logger_config import app_logger as logger
 
-_config_cache = {}
-_last_updated = None
+
+CONFIG_HASH = "system_config"
+CONFIG_CHANNEL = "config_update_channel"
 
 
 def load_config():
-    global _config_cache, _last_updated
+    logger.info("Starting config load from database")
 
     db: Session = SessionLocal()
 
     try:
         configs = db.query(SystemConfig).all()
 
-        _config_cache = {c.config_key: c.config_value for c in configs}
+        if not configs:
+            logger.warning("No system configs found in database")
 
-        if configs:
-            _last_updated = max(c.updated_at for c in configs if c.updated_at)
+        pipe = redis_client.pipeline()
 
-        logger.info(f"Loaded {len(_config_cache)} configs")
+        for c in configs:
+            pipe.hset(CONFIG_HASH, c.config_key, c.config_value)
+
+        pipe.execute()
+
+        redis_client.set(
+            "system_config_last_updated",
+            time.time()
+        )
+
+        logger.info(
+            f"Loaded {len(configs)} configs into Redis cache"
+        )
+
+    except Exception as e:
+        logger.exception(f"Failed to load configs: {e}")
 
     finally:
         db.close()
+        logger.debug("Database session closed after config load")
 
 
 def get_config(key: str, default=None):
-    return _config_cache.get(key, default)
+    try:
+        value = redis_client.hget(CONFIG_HASH, key)
+
+        if value is None:
+            logger.debug(f"Config key '{key}' not found, returning default")
+            return default
+
+        logger.debug(f"Config fetch: {key}={value}")
+        return value
+
+    except Exception as e:
+        logger.exception(f"Redis config read failed for key={key}: {e}")
+        return default
 
 
-def check_for_updates():
-    global _last_updated
-
-    db: Session = SessionLocal()
+def start_config_listener():
+    logger.info("Initializing Redis config listener")
 
     try:
-        latest = db.query(SystemConfig)\
-                   .order_by(SystemConfig.updated_at.desc())\
-                   .first()
+        pubsub = redis_client.pubsub()
+        pubsub.subscribe(CONFIG_CHANNEL)
 
-        if latest and (_last_updated is None or latest.updated_at > _last_updated):
-            logger.info("Config change detected. Reloading...")
+        logger.info(
+            f"Subscribed to Redis channel '{CONFIG_CHANNEL}' for config updates"
+        )
+
+        for message in pubsub.listen():
+
+            if message["type"] != "message":
+                continue
+
+            logger.info(
+                f"Config update event received: {message['data']}"
+            )
+
             load_config()
 
-    finally:
-        db.close()
+    except Exception as e:
+        logger.exception(f"Config listener crashed: {e}")
 
 
-def auto_reload(interval=10):
-    """
-    Check DB every X seconds for config updates
-    """
-    
-    logger.info(f"Starting config auto-reload every {interval} seconds")
+def start_listener_thread():
+    logger.info("Starting config listener thread")
 
-    def watcher():
-        logger.info("Config watcher thread started")
-        while True:
-            try:
-                check_for_updates()
-            except Exception as e:
-                logger.error(f"Config reload error: {e}")
+    def run():
+        try:
+            start_config_listener()
+        except Exception as e:
+            logger.exception(f"Config listener thread failed: {e}")
 
-            time.sleep(interval)
+    Thread(
+        target=run,
+        daemon=True,
+        name="config-listener-thread"
+    ).start()
 
-    Thread(target=watcher, daemon=True).start()
+    logger.info("Config listener thread started successfully")
+
+
+def notify_config_update():
+    try:
+        redis_client.publish(CONFIG_CHANNEL, "reload")
+
+        logger.info(
+            f"Published config reload event to Redis channel '{CONFIG_CHANNEL}'"
+        )
+
+    except Exception as e:
+        logger.exception(f"Failed to publish config update event: {e}")

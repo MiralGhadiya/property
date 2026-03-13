@@ -18,13 +18,11 @@ class LLMServiceUnavailable(LLMError):
 
 
 _client = None
+_current_api_key = None
 
 
 def get_openai_client():
-    global _client
-
-    if _client:
-        return _client
+    global _client, _current_api_key
 
     api_key = get_config("OPENAI_API_KEY")
 
@@ -32,11 +30,18 @@ def get_openai_client():
         logger.error("OPENAI_API_KEY is not set")
         raise RuntimeError("Missing OPENAI_API_KEY")
 
-    _client = OpenAI(api_key=api_key)
+    # If client exists AND key hasn't changed → reuse
+    if _client and _current_api_key == api_key:
+        return _client
 
-    logger.info("OpenAI client initialized successfully")
+    # Otherwise rebuild client
+    logger.info("Initializing OpenAI client with latest API key")
+
+    _client = OpenAI(api_key=api_key)
+    _current_api_key = api_key
 
     return _client
+  
 
 BASE_PROMPT = """
           Role: Certified real estate valuation engine.
@@ -350,8 +355,6 @@ BASIC_JSON_SCHEMA = """
     "zoning":"",
     "title_details":"",
     "construction_year":0,
-    "last_sale_date":"",
-    "last_sale_price":0,
     "ownership_type":""
     },
   "predicted_value":{

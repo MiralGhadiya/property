@@ -4,7 +4,7 @@ import io
 import os
 import base64
 import smtplib
-from uuid import uuid4
+from sqlalchemy import text
 from datetime import datetime, timezone
 import matplotlib.pyplot as plt
 from app.celery_app import celery_app
@@ -92,7 +92,13 @@ def process_valuation_job(self, job_id: str):
 
         ai_json = core
         ai_json["valuation_validity_days"] = 60
-        valuation_id = f"DV-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid4())[:8]}"
+        # valuation_id = f"DV-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid4())[:8]}"
+        
+        today = datetime.now(timezone.utc).strftime("%Y%m%d")
+
+        seq = db.execute(text("SELECT nextval('valuation_seq')")).scalar()
+
+        valuation_id = f"DV-{today}-{seq:04d}"
                 
         print("AI JSON RESPONSE:", ai_json)
         
@@ -193,7 +199,6 @@ def process_valuation_job(self, job_id: str):
                 "user_fields": user_input,
                 "ai_response": ai_json,
                 "report_context": context,
-                # "pdf_path": pdf_path,
             },
         )
 
