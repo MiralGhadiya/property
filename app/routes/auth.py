@@ -83,6 +83,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
             db,
             email=user.email,
             username=user.username,
+            role=user.role,
             mobile_number=user.mobile_number,
             password=user.password,
             country_id=country.id,

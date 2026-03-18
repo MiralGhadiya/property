@@ -32,6 +32,7 @@ def create_user(
     mobile_number: str,
     password: str,
     country_id: int,
+    role: str
 ):
     logger.info(
         f"Creating user username={username} "
@@ -42,6 +43,7 @@ def create_user(
         username=username,
         mobile_number=mobile_number,
         country_id=country_id,
+        role=role,
         hashed_password=hash_password(password),
     )
     try:

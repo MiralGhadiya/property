@@ -13,6 +13,7 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     mobile_number: str
     password: str
+    role: str
 
 
 class UserResponse(UserBase):
