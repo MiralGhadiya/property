@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from app.core.config_manager import get_config
 load_dotenv()
 
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request

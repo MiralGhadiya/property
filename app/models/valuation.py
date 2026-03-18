@@ -64,7 +64,7 @@ class DesktopValuationForm(BaseModel):
     construction_status: Optional[str] = None
     estimated_market_value: Optional[str] = None
     stories: Optional[str] = None
-    purpose_of_valuation: str
+    purpose_of_valuation: Optional[str] = None
     full_name: str
     client_name: Optional[str] = None
     project_name: Optional[str] = None
@@ -87,7 +87,7 @@ def desktop_valuation_form_dep(
     construction_status: Optional[str] = Form(None),
     estimated_market_value: Optional[str] = Form(None),
     stories: Optional[str] = Form(None),
-    purpose_of_valuation: str = Form(...),
+    purpose_of_valuation: Optional[str] = Form(None),
     full_name: str = Form(...),
     client_name: Optional[str] = Form(None),
     project_name: Optional[str] = Form(None),

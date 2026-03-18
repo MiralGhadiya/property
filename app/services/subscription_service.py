@@ -78,7 +78,6 @@ def enforce_subscription(
     if not sub.is_active:
         raise HTTPException(403, "Subscription is inactive")
 
-    # ✅ Normalize DB datetimes
     start_date = to_utc_aware(sub.start_date)
     end_date = to_utc_aware(sub.end_date)
     now = datetime.now(timezone.utc)
@@ -240,6 +239,7 @@ REQUIRED_COLUMNS = {
     "plan_type",
 }
 
+
 def add_subscription_plans_from_excel(
     *,
     db: Session,
@@ -295,11 +295,32 @@ def add_subscription_plans_from_excel(
             else:
                 basic_price = int(round(pro_price * 0.6))
                 basic_reports = pro_reports
+                
+            master_reports = 10
+            master_price = int(round(pro_price * master_reports * 0.8))
 
             existing_pro = db.query(SubscriptionPlan).filter(
                 SubscriptionPlan.name == "PRO",
                 SubscriptionPlan.country_code == country_code,
             ).first()
+            
+            existing_master = db.query(SubscriptionPlan).filter(
+                SubscriptionPlan.name == "MASTER",
+                SubscriptionPlan.country_code == country_code,
+            ).first()
+
+            if not existing_master:
+                db.add(
+                    SubscriptionPlan(
+                        name="MASTER",
+                        country_code=country_code,
+                        price=master_price,
+                        currency=currency,
+                        max_reports=master_reports,
+                        is_active=True,
+                    )
+                )
+                created_plans.append(f"MASTER-{country_code}")
 
             if not existing_pro:
                 db.add(
@@ -343,3 +364,71 @@ def add_subscription_plans_from_excel(
         db.rollback()
         logger.exception("Excel import failed")
         raise HTTPException(500, "Excel processing failed")
+    
+    
+def get_usable_subscription(
+    db: Session,
+    user_id: int,
+    country_code: str,
+):
+    logger.debug(
+        f"Fetching usable subscription user_id={user_id} country={country_code}"
+    )
+
+    now = datetime.now(timezone.utc)
+
+    subs = (
+        db.query(UserSubscription)
+        .join(SubscriptionPlan)
+        .filter(
+            UserSubscription.user_id == user_id,
+            UserSubscription.is_active == True,
+            UserSubscription.is_expired == False,
+            UserSubscription.start_date <= now,
+            UserSubscription.end_date >= now,
+            SubscriptionPlan.country_code == country_code,
+            SubscriptionPlan.is_active == True,
+        )
+        .order_by(
+            SubscriptionPlan.price.desc(),
+            UserSubscription.end_date.desc(),
+        )
+        .all()
+    )
+
+    for sub in subs:
+        plan = sub.plan
+
+        # Unlimited reports plan
+        if plan.max_reports is None:
+            return sub
+
+        # Limited plan with remaining reports
+        if sub.reports_used < plan.max_reports:
+            return sub
+
+    return None
+
+
+def get_usable_subscription_with_fallback(
+    db: Session,
+    user_id: int,
+    country_code: str,
+):
+    subscription = get_usable_subscription(
+        db=db,
+        user_id=user_id,
+        country_code=country_code,
+    )
+
+    if subscription:
+        return subscription
+
+    if country_code != "DEFAULT":
+        return get_usable_subscription(
+            db=db,
+            user_id=user_id,
+            country_code="DEFAULT",
+        )
+
+    return None

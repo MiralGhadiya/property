@@ -80,15 +80,40 @@ def process_valuation_job(self, job_id: str):
         # forecast = generate_forecast(core)
         # core["forecast"] = forecast
 
-        if plan_name == "PRO":
-            core["swot_analysis"] = generate_swot(core)
-        else:
-            core["swot_analysis"] = {
-                "strengths": [],
-                "weaknesses": [],
-                "opportunities": [],
-                "threats": []
-            }
+        # if plan_name in ["PRO", "MASTER"]:
+        #     core["swot_analysis"] = generate_swot(core)
+        # else:
+        #     core["swot_analysis"] = {
+        #         "strengths": [],
+        #         "weaknesses": [],
+        #         "opportunities": [],
+        #         "threats": []
+        #     }
+        
+        if plan_name in ["PRO", "MASTER"]:
+            try:
+                # Ensure bank_lending_model exists
+                if "bank_lending_model" not in core:
+                    core["bank_lending_model"] = {
+                        "recommended_ltv": 0,
+                        "safe_lending_value": 0,
+                        "risk_level": "medium",
+                        "reason": ""
+                    }
+
+                elif "risk_level" not in core["bank_lending_model"]:
+                    core["bank_lending_model"]["risk_level"] = "medium"
+
+                core["swot_analysis"] = generate_swot(core)
+
+            except Exception as e:
+                logger.warning(f"SWOT generation failed: {e}")
+                core["swot_analysis"] = {
+                    "strengths": [],
+                    "weaknesses": [],
+                    "opportunities": [],
+                    "threats": []
+                }
 
         ai_json = core
         ai_json["valuation_validity_days"] = 60

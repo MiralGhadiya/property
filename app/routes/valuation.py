@@ -24,13 +24,15 @@ from app.common import PaginatedResponse
 from app.deps import get_current_user, pagination_params
 from app.models.country import Country
 from app.tasks.valuation_tasks import process_valuation_job, send_report_email_task
-from app.services.subscription_service import enforce_subscription
-from app.models import User, ValuationReport
+from app.services.subscription_service import get_usable_subscription_with_fallback
+
+from app.models import User, ValuationReport, subscription
 from app.models.valuation import (
     DesktopValuationForm,
     ValuationJob,
     desktop_valuation_form_dep,
 )
+from app.utils.maps import geocode_address
 from app.utils.date_filters import filter_by_date_range
 from app.utils.logger_config import app_logger as logger
 
@@ -44,15 +46,13 @@ router = APIRouter()
 @router.post("/create")
 async def create_valuation_form(
     request: Request,
-    subscription_id: UUID = Form(...),
     form: DesktopValuationForm = Depends(desktop_valuation_form_dep),
     attachment: UploadFile = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     logger.info(
-        f"Valuation request started user_id={current_user.id} "
-        f"subscription_id={subscription_id}"
+        f"Valuation request started user_id={current_user.id}"
     )
 
     try:
@@ -65,28 +65,41 @@ async def create_valuation_form(
     if not category:
         raise HTTPException(400, "Invalid property type")
 
-    # Enforce subscription
-    try:
-        subscription = enforce_subscription(
-            db=db,
-            user_id=current_user.id,
-            subscription_id=subscription_id,
-        )
-    except HTTPException:
-        raise
-    except Exception:
-        logger.exception("Subscription enforcement failed")
-        raise HTTPException(500, "Subscription validation failed")
+    address = user_input.get("full_address")
+    if not address:
+        raise HTTPException(400, "Property address is required")
 
-    # Resolve country
-    country_code = (
-        current_user.country.country_code
-        if getattr(current_user, "country", None)
-        else getattr(request.state, "ip_country", None)
-        or "UNKNOWN"
+    geo = geocode_address(address)
+
+    if not geo or not geo.get("country_code"):
+        raise HTTPException(400, "Unable to detect property country")
+
+    detected_country = geo["country_code"]
+
+    subscription = get_usable_subscription_with_fallback(
+        db=db,
+        user_id=current_user.id,
+        country_code=detected_country,
     )
 
-    # Create Job
+    if not subscription:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"No active subscription with remaining reports found for "
+                f"{detected_country}. Please purchase a plan first."
+            ),
+        )
+
+    if subscription.plan.country_code not in [detected_country, "DEFAULT"]:
+        raise HTTPException(
+            400,
+            f"Resolved plan country ({subscription.plan.country_code}) "
+            f"is not valid for property location ({detected_country})"
+        )
+
+    country_code = detected_country
+
     job = ValuationJob(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
@@ -101,7 +114,6 @@ async def create_valuation_form(
         db.add(job)
         db.commit()
 
-        # Trigger Celery Task
         process_valuation_job.delay(job.id)
 
     except Exception:
@@ -119,9 +131,15 @@ async def create_valuation_form(
         "job_id": job.id,
         "status": "queued",
         "message": "Valuation job queued successfully",
+        # "subscription_id": str(subscription.id),
+        # "subscription_country": subscription.plan.country_code,
+        # "reports_remaining": (
+        #     None if subscription.plan.max_reports is None
+        #     else subscription.plan.max_reports - subscription.reports_used - 1
+        # ),
     }
-
-
+    
+    
 # ==========================================================
 # MY VALUATIONS
 # ==========================================================
