@@ -3,6 +3,7 @@
 from uuid import UUID
 from typing import Optional
 from datetime import datetime
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 
@@ -128,7 +129,15 @@ def list_subscription_plans(
 
     total = query.count()
 
-    query = query.order_by(SubscriptionPlan.country_code.asc())
+    query = query.order_by(
+        case(
+            (SubscriptionPlan.country_code == "GLOBAL", 0),  # Global first
+            else_=1
+        ),
+        SubscriptionPlan.country_code.asc(),            # Then country
+        SubscriptionPlan.price.asc()                    # Then price (ascending)
+    )
+    
     if params["limit"] is not None:
         query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
     

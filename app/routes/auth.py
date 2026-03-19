@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from app.core.config_manager import get_config
 load_dotenv()
 
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -72,7 +72,11 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
     try:
         dial_code, country_code = get_country_from_mobile(user.mobile_number)
+    except ValueError as e:
+    # This will show exact phone validation error to user
+        raise HTTPException(status_code=400, detail=str(e))
 
+    try:
         country = country_service.get_country_by_dial_code(db, dial_code)
         if not country:
             country = country_service.create_country(
@@ -83,6 +87,7 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
             db,
             email=user.email,
             username=user.username,
+            role=user.role,
             mobile_number=user.mobile_number,
             password=user.password,
             country_id=country.id,

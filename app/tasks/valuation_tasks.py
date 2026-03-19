@@ -40,6 +40,18 @@ def get_currency_from_country(db, country_code):
     return country.currency_code
 
 
+def build_calculation_input(user_input: dict):
+    """
+    Keep user values only if provided.
+    Remove empty fields so AI can infer them.
+    """
+    return {
+        k: v
+        for k, v in user_input.items()
+        if v not in [None, "", "null"]
+    }
+
+
 @celery_app.task(
     bind=True,
     autoretry_for=(RuntimeError,),
@@ -68,7 +80,10 @@ def process_valuation_job(self, job_id: str):
         
         plan_name = subscription.plan.name.upper()
         
-        core = generate_valuation_report(user_input, plan=plan_name)
+        # core = generate_valuation_report(user_input, plan=plan_name)
+        
+        calculation_input = build_calculation_input(user_input)
+        core = generate_valuation_report(calculation_input, plan=plan_name)
         
         if plan_name != "BASIC":
             forecast = generate_forecast(core)
@@ -80,15 +95,40 @@ def process_valuation_job(self, job_id: str):
         # forecast = generate_forecast(core)
         # core["forecast"] = forecast
 
-        if plan_name == "PRO":
-            core["swot_analysis"] = generate_swot(core)
-        else:
-            core["swot_analysis"] = {
-                "strengths": [],
-                "weaknesses": [],
-                "opportunities": [],
-                "threats": []
-            }
+        # if plan_name in ["PRO", "MASTER"]:
+        #     core["swot_analysis"] = generate_swot(core)
+        # else:
+        #     core["swot_analysis"] = {
+        #         "strengths": [],
+        #         "weaknesses": [],
+        #         "opportunities": [],
+        #         "threats": []
+        #     }
+        
+        if plan_name in ["PRO", "MASTER", "GLOBAL"]:
+            try:
+                # Ensure bank_lending_model exists
+                if "bank_lending_model" not in core:
+                    core["bank_lending_model"] = {
+                        "recommended_ltv": 0,
+                        "safe_lending_value": 0,
+                        "risk_level": "medium",
+                        "reason": ""
+                    }
+
+                elif "risk_level" not in core["bank_lending_model"]:
+                    core["bank_lending_model"]["risk_level"] = "medium"
+
+                core["swot_analysis"] = generate_swot(core)
+
+            except Exception as e:
+                logger.warning(f"SWOT generation failed: {e}")
+                core["swot_analysis"] = {
+                    "strengths": [],
+                    "weaknesses": [],
+                    "opportunities": [],
+                    "threats": []
+                }
 
         ai_json = core
         ai_json["valuation_validity_days"] = 60

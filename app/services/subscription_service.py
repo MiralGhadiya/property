@@ -1,8 +1,9 @@
 #app/services/subscription_service.py
 
-from io import BytesIO
 import pandas as pd
+from io import BytesIO
 from typing import List
+from sqlalchemy import case
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -12,12 +13,61 @@ from app.models.subscription import SubscriptionPlan, UserSubscription
 
 from app.utils.logger_config import app_logger as logger
 
+
+GLOBAL_COUNTRY_CODE = "GLOBAL"
+DEFAULT_COUNTRY_CODE = "DEFAULT"
+
+PLAN_FEATURE_PRIORITY = {
+    "MASTER": 4,
+    "PRO": 3,
+    "GLOBAL": 2,
+    "BASIC": 1,
+}
+
+
 def to_utc_aware(dt):
     if dt is None:
         return None
     if dt.tzinfo is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+
+
+def get_plan_priority(plan_name: str) -> int:
+    return PLAN_FEATURE_PRIORITY.get((plan_name or "").upper(), 0)
+
+
+def _base_usable_subscription_query(
+    db: Session,
+    user_id: int,
+    country_code: str,
+):
+    now = datetime.now(timezone.utc)
+
+    return (
+        db.query(UserSubscription)
+        .join(SubscriptionPlan)
+        .filter(
+            UserSubscription.user_id == user_id,
+            UserSubscription.is_active == True,
+            UserSubscription.is_expired == False,
+            UserSubscription.start_date <= now,
+            UserSubscription.end_date >= now,
+            SubscriptionPlan.country_code == country_code,
+            SubscriptionPlan.is_active == True,
+        )
+        .order_by(
+            case(
+                (SubscriptionPlan.name == "MASTER", 0),
+                (SubscriptionPlan.name == "PRO", 1),
+                (SubscriptionPlan.name == "GLOBAL", 2),
+                (SubscriptionPlan.name == "BASIC", 3),
+                else_=4,
+            ),
+            SubscriptionPlan.price.desc(),
+            UserSubscription.end_date.desc(),
+        )
+    )
 
 
 def get_active_subscription(
@@ -28,21 +78,40 @@ def get_active_subscription(
     logger.debug(
         f"Fetching active subscription user_id={user_id} country={country_code}"
     )
-    
-    now = datetime.now(timezone.utc)
-    return (
-        db.query(UserSubscription)
-        .join(SubscriptionPlan)
-        .filter(
-            UserSubscription.user_id == user_id,
-            UserSubscription.is_active == True,
-            UserSubscription.start_date <= now,
-            UserSubscription.end_date >= now,
-            SubscriptionPlan.country_code == country_code,
-            SubscriptionPlan.is_active == True,
+
+    local_sub = (
+        _base_usable_subscription_query(
+            db=db,
+            user_id=user_id,
+            country_code=country_code,
         )
         .first()
     )
+    if local_sub:
+        return local_sub
+
+    global_sub = (
+        _base_usable_subscription_query(
+            db=db,
+            user_id=user_id,
+            country_code=GLOBAL_COUNTRY_CODE,
+        )
+        .first()
+    )
+    if global_sub:
+        return global_sub
+
+    if country_code != DEFAULT_COUNTRY_CODE:
+        return (
+            _base_usable_subscription_query(
+                db=db,
+                user_id=user_id,
+                country_code=DEFAULT_COUNTRY_CODE,
+            )
+            .first()
+        )
+
+    return None
 
 
 def enforce_subscription(
@@ -78,7 +147,6 @@ def enforce_subscription(
     if not sub.is_active:
         raise HTTPException(403, "Subscription is inactive")
 
-    # ✅ Normalize DB datetimes
     start_date = to_utc_aware(sub.start_date)
     end_date = to_utc_aware(sub.end_date)
     now = datetime.now(timezone.utc)
@@ -240,6 +308,7 @@ REQUIRED_COLUMNS = {
     "plan_type",
 }
 
+
 def add_subscription_plans_from_excel(
     *,
     db: Session,
@@ -259,12 +328,23 @@ def add_subscription_plans_from_excel(
             )
 
         created_plans = []
+        global_reference_pro_price = None
 
         grouped = df.groupby("country_code")
 
         for country_code, group in grouped:
 
             country_code = country_code.upper()
+            
+            if country_code == GLOBAL_COUNTRY_CODE:
+                row = group.iloc[0]
+
+                excel_global_plan = {
+                    "price": int(row["price"]),
+                    "currency": row["currency"].upper(),
+                    "max_reports": int(row["max_reports"]),
+                }
+                continue
 
             pro_row = group[group["plan_type"].str.upper() == "PRO"]
             basic_row = group[group["plan_type"].str.upper() == "BASIC"]
@@ -295,11 +375,35 @@ def add_subscription_plans_from_excel(
             else:
                 basic_price = int(round(pro_price * 0.6))
                 basic_reports = pro_reports
+                
+            master_reports = 10
+            master_price = int(round(pro_price * master_reports * 0.8))
+            
+            if global_reference_pro_price is None:
+                global_reference_pro_price = pro_price
 
             existing_pro = db.query(SubscriptionPlan).filter(
                 SubscriptionPlan.name == "PRO",
                 SubscriptionPlan.country_code == country_code,
             ).first()
+            
+            existing_master = db.query(SubscriptionPlan).filter(
+                SubscriptionPlan.name == "MASTER",
+                SubscriptionPlan.country_code == country_code,
+            ).first()
+
+            if not existing_master:
+                db.add(
+                    SubscriptionPlan(
+                        name="MASTER",
+                        country_code=country_code,
+                        price=master_price,
+                        currency=currency,
+                        max_reports=master_reports,
+                        is_active=True,
+                    )
+                )
+                created_plans.append(f"MASTER-{country_code}")
 
             if not existing_pro:
                 db.add(
@@ -331,6 +435,71 @@ def add_subscription_plans_from_excel(
                     )
                 )
                 created_plans.append(f"BASIC-{country_code}")
+                
+        existing_global = db.query(SubscriptionPlan).filter(
+            SubscriptionPlan.country_code == GLOBAL_COUNTRY_CODE
+        ).all()
+
+        for plan in existing_global:
+            db.delete(plan)
+            
+        db.flush()
+
+        existing_globals = db.query(SubscriptionPlan).filter(
+            SubscriptionPlan.country_code == GLOBAL_COUNTRY_CODE
+        ).all()
+
+        for plan in existing_globals:
+            db.delete(plan)
+
+        db.flush()
+
+        # ✅ PRIORITY 1: Use Excel GLOBAL
+        if excel_global_plan:
+            db.add(
+                SubscriptionPlan(
+                    name="GLOBAL",
+                    country_code=GLOBAL_COUNTRY_CODE,
+                    price=excel_global_plan["price"],
+                    currency=excel_global_plan["currency"],
+                    max_reports=excel_global_plan["max_reports"],
+                    is_active=True,
+                )
+            )
+            created_plans.append("GLOBAL")
+
+        # ✅ PRIORITY 2: fallback to auto-calc
+        elif global_reference_pro_price is not None:
+            global_reports = 10
+            global_price = int(round(global_reference_pro_price * global_reports * 0.8))
+
+            db.add(
+                SubscriptionPlan(
+                    name="GLOBAL",
+                    country_code=GLOBAL_COUNTRY_CODE,
+                    price=global_price,
+                    currency="USD",
+                    max_reports=global_reports,
+                    is_active=True,
+                )
+            )
+            created_plans.append("GLOBAL")
+
+        if not existing_global and global_reference_pro_price is not None:
+            global_reports = 10
+            global_price = int(round(global_reference_pro_price * global_reports * 0.8))
+
+            db.add(
+                SubscriptionPlan(
+                    name="GLOBAL",
+                    country_code=GLOBAL_COUNTRY_CODE,
+                    price=global_price,
+                    currency="USD",
+                    max_reports=global_reports,
+                    is_active=True,
+                )
+            )
+            created_plans.append("GLOBAL")
 
         db.commit()
 
@@ -343,3 +512,61 @@ def add_subscription_plans_from_excel(
         db.rollback()
         logger.exception("Excel import failed")
         raise HTTPException(500, "Excel processing failed")
+    
+    
+def get_usable_subscription(
+    db: Session,
+    user_id: int,
+    country_code: str,
+):
+    logger.debug(
+        f"Fetching usable subscription user_id={user_id} country={country_code}"
+    )
+
+    subs = _base_usable_subscription_query(
+        db=db,
+        user_id=user_id,
+        country_code=country_code,
+    ).all()
+
+    for sub in subs:
+        plan = sub.plan
+
+        if plan.max_reports is None:
+            return sub
+
+        if sub.reports_used < plan.max_reports:
+            return sub
+
+    return None
+
+
+def get_usable_subscription_with_fallback(
+    db: Session,
+    user_id: int,
+    country_code: str,
+):
+    local_sub = get_usable_subscription(
+        db=db,
+        user_id=user_id,
+        country_code=country_code,
+    )
+    if local_sub:
+        return local_sub
+
+    global_sub = get_usable_subscription(
+        db=db,
+        user_id=user_id,
+        country_code=GLOBAL_COUNTRY_CODE,
+    )
+    if global_sub:
+        return global_sub
+
+    if country_code != DEFAULT_COUNTRY_CODE:
+        return get_usable_subscription(
+            db=db,
+            user_id=user_id,
+            country_code=DEFAULT_COUNTRY_CODE,
+        )
+
+    return None

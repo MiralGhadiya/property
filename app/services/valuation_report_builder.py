@@ -17,27 +17,38 @@ def _build_property_details(user_input, ai_json, construction_year, property_age
     
     return {
         "name_of_owner": user_input.get("full_name", "N/A"),
-        "project_name": user_input.get("project_name", "N/A"),
+        # "project_name": user_input.get("project_name", "N/A"),
+        "project_name": (
+            user_input.get("project_name")
+            or ai_json["property_details"].get("project_name")
+            or ai_json["property_details"].get("developer")
+            or "Independent Property"
+        ),
         "property_address": ai_json["property_details"].get("address", "N/A"),
         "property_type": ai_json["property_details"].get("property_type", "N/A"),
-        "configuration": _get_value_or_fallback(
-            user_input.get("configuration"),
-            ai_json["property_details"].get("configuration")
-        ),
+        # "configuration": _get_value_or_fallback(
+        #     user_input.get("configuration"),
+        #     ai_json["property_details"].get("configuration")
+        # ),
+        "configuration": ai_json["property_details"].get("configuration"),
         "land_area_sqft": ai_json["property_details"].get("land_area_sqft", "N/A"),
         "carpet_area": built_up_area if built_up_area else "N/A",
-        "construction_status": _get_value_or_fallback(
-            user_input.get("construction_status"),
-            ai_json["property_details"].get("construction_status")
-        ),
-        "construction_year": _get_value_or_fallback(
-            construction_year,
-            ai_json["property_details"].get("construction_year")
-        ),
-        "property_age_years": _get_value_or_fallback(
-            property_age,
-            ai_json["property_details"].get("age_years")
-        ),
+        # "construction_status": _get_value_or_fallback(
+        #     user_input.get("construction_status"),
+        #     ai_json["property_details"].get("construction_status")
+        # ),
+        
+        "construction_status": ai_json["property_details"].get("construction_status"),
+        # "construction_year": _get_value_or_fallback(
+        #     construction_year,
+        #     ai_json["property_details"].get("construction_year")
+        # ),
+        "construction_year": ai_json["property_details"].get("construction_year"),
+        # "property_age_years": _get_value_or_fallback(
+        #     property_age,
+        #     ai_json["property_details"].get("age_years")
+        # ),
+        "property_age_years": ai_json["property_details"].get("age_years"),
         # "last_sale_date": _get_value_or_fallback(
         #     user_input.get("last_sale_date"),
         #     ai_json["property_details"].get("last_sale_date")
@@ -46,12 +57,18 @@ def _build_property_details(user_input, ai_json, construction_year, property_age
         #     user_input.get("last_sale_price"),
         #     ai_json["property_details"].get("last_sale_price")
         # ),
-        "ownership_type": _get_value_or_fallback(
-            user_input.get("ownership_type"),
-            ai_json["property_details"].get("ownership_type")
-        ),
+        # "ownership_type": _get_value_or_fallback(
+        #     user_input.get("ownership_type"),
+        #     ai_json["property_details"].get("ownership_type")
+        # ),
+        "ownership_type": ai_json["property_details"].get("ownership_type"),
         "title_details": ai_json["property_details"].get("title_details", "N/A"),
-        "purpose_of_report": user_input.get("purpose_of_valuation", "N/A"),
+        # "purpose_of_report": user_input.get("purpose_of_valuation", "N/A"),
+        "purpose_of_report": (
+            user_input.get("purpose_of_valuation")
+            or ai_json["property_details"].get("purpose_of_valuation")
+            or "Market Value Assessment"
+        ),
         "type_of_valuation": "Desktop Valuation Opinion",
         "inspection": "No Physical Inspection Conducted",
         "confidentiality": "Strictly for internal reference",

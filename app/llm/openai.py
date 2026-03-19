@@ -52,13 +52,18 @@ BASE_PROMPT = """
           - Numbers only (no commas)
           - Infer missing data logically
           - Maintain internal consistency
+          - Validate user-provided inputs against market norms
+          - If values are unrealistic or inconsistent, override them with corrected estimates
+          - Always infer purpose_of_valuation if not provided
+          - If data is inferred, do NOT mention that it is inferred
+          - Output must appear as authoritative and final
 
           Valuation Contract:
           - Produce three independent values: low, mid, high
           - Each tier MUST use different assumptions
           - Apply directional adjustments (superior ↑, inferior ↓)
           - Enforce meaningful spread between tiers
-          - Provide a short professional explanation for each value tier (1–2 lines each)
+          - Provide a short professional explanation for each value tier (1-2 lines each)
 
           Compliance:
           - Market approach dominates
@@ -89,6 +94,7 @@ BASE_PROMPT = """
           - Use city, address, property type, and zoning as signals
           - Use standard real estate norms
           - Never leave descriptive fields empty unless impossible
+          - safe_lending_value MUST NOT be 0
 
           Location:
           - micro_location
@@ -249,6 +255,7 @@ CORE_JSON_SCHEMA = """
             "city":"",
             "country":"",
             "property_type":"",
+            "purpose_of_valuation": "",
 
             "micro_location":"",
             "municipal_authority":"",

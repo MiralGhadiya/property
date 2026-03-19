@@ -2,20 +2,21 @@
 
 from uuid import UUID
 from typing import Optional
+
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from app.services.country_service import get_country_by_country_code
 
 from app.models import User
+from app.models.country import Country
 from app.models.subscription import SubscriptionPlan, UserSubscription
 
-from app.services.exchange_rate_service import get_rate
-from app.services.currency_resolver import resolve_currency
+from app.services.pricing import get_plans_with_pricing
 
 from app.common import PaginatedResponse
 from app.routes.payment import create_order
 
+from app.utils.maps import geocode_address
 from app.utils.date_filters import filter_by_date_range
 from app.utils.logger_config import app_logger as logger
 
@@ -30,99 +31,33 @@ def list_plans(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
-    
     ip_country = getattr(request.state, "ip_country", None)
-    
-    if current_user and current_user.country:
-        user_country = current_user.country.country_code
-        print("user_country", user_country)
-    else:
-        user_country = None
-        
-    print(user_country)
+
+    user_country = (
+        current_user.country.country_code
+        if current_user and current_user.country
+        else None
+    )
 
     country = ip_country or user_country or "DEFAULT"
 
-    logger.info(
-        f"IP country={ip_country}, "
-        f"user country={current_user.country.country_code if current_user and current_user.country else None}, "
-        f"final pricing country={country}"
-    )
-    
-    plans = db.query(SubscriptionPlan).filter(
-        SubscriptionPlan.country_code == country,
-        SubscriptionPlan.is_active == True,
-    ).all()
+    return get_plans_with_pricing(db, country, current_user)
 
-    if plans:
-        return plans
 
-    usd_plans = db.query(SubscriptionPlan).filter(
-        SubscriptionPlan.country_code == "DEFAULT",
-        SubscriptionPlan.currency == "USD",
-        SubscriptionPlan.is_active == True,
-    ).all()
+@router.get("/plans/by-address")
+def get_plans_by_address_get(
+    address: str = Query(...),
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
+    geo = geocode_address(address)
 
-    if not usd_plans:
-        return []
-    
-    # country_obj = get_country_by_country_code(db, country)
+    if not geo:
+        raise HTTPException(400, "Unable to detect location")
 
-    # if country_obj and country_obj.currency_code:
-    #     user_currency = country_obj.currency_code
-    # else:
-    #     user_currency = "USD"
-    
-    
-    # Try to resolve currency from user profile first
-    profile_currency = (
-        current_user.country.currency_code
-        if current_user and current_user.country and current_user.country.currency_code
-        else None
-    )
+    country = geo.get("country_code") or "DEFAULT"
 
-    user_currency = "USD"
-    rate = None
-
-    # Step 2: Use profile currency if valid
-    profile_currency = (
-        current_user.country.currency_code
-        if current_user and current_user.country and current_user.country.currency_code
-        else None
-    )
-
-    user_currency, rate = resolve_currency(
-        db=db,
-        country_code=country,
-        profile_currency=profile_currency
-    )
-
-    if rate is None:
-        logger.warning(f"No exchange rate for currency={user_currency}")
-    # rate = get_rate(db, user_currency) if user_currency != "USD" else None
-    
-    if rate is None:
-        logger.warning(f"No exchange rate for currency={user_currency}")
-
-    response = []
-    for plan in usd_plans:
-        # converted_price = round(plan.price * rate, 2) if rate else plan.price
-        converted_price = (
-            round(plan.price * rate, 2)
-            if rate is not None
-            else plan.price
-        )
-
-        response.append({
-            "id": plan.id,
-            "name": plan.name,
-            "price": converted_price,
-            "currency": user_currency if rate else "USD",
-            "converted": True,
-            "base_price_usd": plan.price,
-        })
-
-    return response
+    return get_plans_with_pricing(db, country, current_user)
 
 
 @router.get("/my-plans")
@@ -133,14 +68,18 @@ def get_my_active_plans(
     now = datetime.now(timezone.utc)
     try:
         plans = (
-            db.query(UserSubscription)
+            db.query(UserSubscription, Country)
             .join(SubscriptionPlan)
+            .outerjoin(Country, Country.country_code == SubscriptionPlan.country_code)
             .filter(
                 UserSubscription.user_id == current_user.id,
                 UserSubscription.is_active == True,
                 UserSubscription.start_date <= now,
                 UserSubscription.end_date >= now,
                 SubscriptionPlan.is_active == True,
+            ).filter(
+                (SubscriptionPlan.max_reports == None) |
+                (UserSubscription.reports_used < SubscriptionPlan.max_reports)
             )
             .order_by(UserSubscription.end_date.asc())
             .all()
@@ -157,6 +96,11 @@ def get_my_active_plans(
             "subscription_id": s.id,
             "plan_name": s.plan.name,
             "country": s.plan.country_code,
+            "country_name": (
+                "Global"
+                if s.plan.country_code == "GLOBAL"
+                else (c.name if c else None)
+            ),
             "price": s.plan.price,
             "currency": s.plan.currency,
             "max_reports": s.plan.max_reports,
@@ -168,7 +112,7 @@ def get_my_active_plans(
             "start_date": s.start_date,
             "end_date": s.end_date,
         }
-        for s in plans
+        for s, c in plans
     ]
     
     
