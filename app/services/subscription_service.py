@@ -436,40 +436,56 @@ def add_subscription_plans_from_excel(
                 )
                 created_plans.append(f"BASIC-{country_code}")
                 
+        # existing_global = db.query(SubscriptionPlan).filter(
+        #     SubscriptionPlan.country_code == GLOBAL_COUNTRY_CODE
+        # ).all()
+
+        # for plan in existing_global:
+        #     db.delete(plan)
+            
+        # db.flush()
+
+        # existing_globals = db.query(SubscriptionPlan).filter(
+        #     SubscriptionPlan.country_code == GLOBAL_COUNTRY_CODE
+        # ).all()
+
+        # for plan in existing_globals:
+        #     db.delete(plan)
+
+        # db.flush()
+
+        # ✅ PRIORITY 1: Use Excel GLOBAL
         existing_global = db.query(SubscriptionPlan).filter(
             SubscriptionPlan.country_code == GLOBAL_COUNTRY_CODE
-        ).all()
-
-        for plan in existing_global:
-            db.delete(plan)
-            
-        db.flush()
-
-        existing_globals = db.query(SubscriptionPlan).filter(
-            SubscriptionPlan.country_code == GLOBAL_COUNTRY_CODE
-        ).all()
-
-        for plan in existing_globals:
-            db.delete(plan)
-
-        db.flush()
+        ).first()
 
         # ✅ PRIORITY 1: Use Excel GLOBAL
         if excel_global_plan:
-            db.add(
-                SubscriptionPlan(
-                    name="GLOBAL",
-                    country_code=GLOBAL_COUNTRY_CODE,
-                    price=excel_global_plan["price"],
-                    currency=excel_global_plan["currency"],
-                    max_reports=excel_global_plan["max_reports"],
-                    is_active=True,
+            if existing_global:
+                logger.info("[GLOBAL] Updating existing GLOBAL plan")
+
+                existing_global.price = excel_global_plan["price"]
+                existing_global.currency = excel_global_plan["currency"]
+                existing_global.max_reports = excel_global_plan["max_reports"]
+                existing_global.is_active = True
+
+            else:
+                logger.info("[GLOBAL] Creating new GLOBAL plan")
+
+                db.add(
+                    SubscriptionPlan(
+                        name="GLOBAL",
+                        country_code=GLOBAL_COUNTRY_CODE,
+                        price=excel_global_plan["price"],
+                        currency=excel_global_plan["currency"],
+                        max_reports=excel_global_plan["max_reports"],
+                        is_active=True,
+                    )
                 )
-            )
-            created_plans.append("GLOBAL")
+                created_plans.append("GLOBAL")
 
         # ✅ PRIORITY 2: fallback to auto-calc
-        elif global_reference_pro_price is not None:
+        elif not existing_global and global_reference_pro_price is not None:
             global_reports = 10
             global_price = int(round(global_reference_pro_price * global_reports * 0.8))
 

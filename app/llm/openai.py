@@ -288,7 +288,7 @@ CORE_JSON_SCHEMA = """
 
             "land_area_sqft":0,
             "built_up_area_sqft":0,
-            "age_years":2017,
+            "age_years":0,
             "ownership_type":"",
             "zoning":"",
             
@@ -368,7 +368,7 @@ BASIC_JSON_SCHEMA = """
     "construction_status":"",
     "land_area_sqft":0,
     "built_up_area_sqft":0,
-    "age_years":2017,
+    "age_years":0,
     "zoning":"",
     "title_details":"",
     "construction_year":0,
