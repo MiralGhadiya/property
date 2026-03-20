@@ -67,6 +67,7 @@ def _build_property_details(user_input, ai_json, construction_year, property_age
         "purpose_of_report": (
             user_input.get("purpose_of_valuation")
             or ai_json["property_details"].get("purpose_of_valuation")
+            or ai_json.get("purpose_of_report")
             or "Market Value Assessment"
         ),
         "type_of_valuation": "Desktop Valuation Opinion",

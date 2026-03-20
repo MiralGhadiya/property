@@ -133,6 +133,15 @@ BASE_PROMPT = """
           - Australia → AUD
           - Canada → CAD
           - Always produce valuation numbers in the local currency of the property country
+          
+          STRICT OUTPUT RULES (CRITICAL):
+          - DO NOT return null, empty, or missing fields
+          - Every field in the JSON schema MUST have a valid value
+          - If exact value is unknown, generate a realistic estimate
+          - Use:
+              0 for numeric fields
+              "N/A" for text fields ONLY if absolutely unavoidable
+          - Prefer realistic inferred values over "N/A"
         """
 
 PROPERTY_PROMPTS = {
@@ -279,7 +288,8 @@ CORE_JSON_SCHEMA = """
 
             "land_area_sqft":0,
             "built_up_area_sqft":0,
-            "age_years":0,
+            "age_years":2017,
+            "ownership_type":"",
             "zoning":"",
             
             "market_risk_score":0,
@@ -358,7 +368,7 @@ BASIC_JSON_SCHEMA = """
     "construction_status":"",
     "land_area_sqft":0,
     "built_up_area_sqft":0,
-    "age_years":0,
+    "age_years":2017,
     "zoning":"",
     "title_details":"",
     "construction_year":0,
@@ -513,7 +523,10 @@ def generate_valuation_report(form_data: dict, plan: str = "PRO"):
         """
     )
 
-    schema = CORE_JSON_SCHEMA if plan == "PRO" else BASIC_JSON_SCHEMA
+    if plan in ["PRO", "MASTER", "GLOBAL"]:
+        schema = CORE_JSON_SCHEMA
+    else:
+        schema = BASIC_JSON_SCHEMA
 
     final_prompt = f"""
     {BASE_PROMPT}

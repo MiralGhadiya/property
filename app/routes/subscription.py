@@ -57,7 +57,7 @@ def get_plans_by_address_get(
 
     country = geo.get("country_code") or "DEFAULT"
 
-    return get_plans_with_pricing(db, country, current_user)
+    return get_plans_with_pricing(db, country, current_user, force_currency_by_country=True)
 
 
 @router.get("/my-plans")
