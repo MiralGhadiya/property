@@ -28,6 +28,11 @@ logger.info("Starting Desktop Valuation API")
 
 app = FastAPI(title="Desktop Valuation API")
 
+
+@app.get("/health", tags=["system"])
+def healthcheck():
+    return {"status": "ok"}
+
 @app.on_event("startup")
 def startup_event():
     logger.info("Loading system configuration from database...")

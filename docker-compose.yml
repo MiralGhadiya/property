@@ -1,3 +1,39 @@
+x-app-environment: &app-environment
+  ENV: ${ENV:-production}
+  DATABASE_URL: ${DATABASE_URL:-}
+  POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+  POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+  POSTGRES_DB: ${POSTGRES_DB:-desktop_db}
+  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+  POSTGRES_SSLMODE: ${POSTGRES_SSLMODE:-prefer}
+  POSTGRES_CONNECT_TIMEOUT: ${POSTGRES_CONNECT_TIMEOUT:-10}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  STARTUP_MAX_RETRIES: ${STARTUP_MAX_RETRIES:-20}
+  STARTUP_RETRY_DELAY: ${STARTUP_RETRY_DELAY:-3}
+
+x-app-dependencies: &app-dependencies
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+
+x-app-volumes: &app-volumes
+  - generated_reports_data:/app/generated_reports
+  - uploads_data:/app/uploads
+  - app_logs_data:/app/app/logs
+  - celerybeat_data:/app/run
+
+x-app-service: &app-service
+  image: desktop-valuation:local
+  restart: unless-stopped
+  init: true
+  env_file:
+    - .env
+  environment: *app-environment
+  depends_on: *app-dependencies
+  volumes: *app-volumes
+
 services:
   postgres:
     image: postgres:16
@@ -17,7 +53,7 @@ services:
       retries: 5
 
   redis:
-    image: redis:7
+    image: redis:7-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
@@ -29,104 +65,29 @@ services:
       retries: 5
 
   api:
-    build: .
-    restart: unless-stopped
+    <<: *app-service
+    build:
+      context: .
+      dockerfile: Dockerfile
     expose:
       - "8000"
-    env_file:
-      - .env
-    environment:
-      ENV: ${ENV:-production}
-      DATABASE_URL: ${DATABASE_URL:-}
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_DB: ${POSTGRES_DB:-desktop_db}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_SSLMODE: ${POSTGRES_SSLMODE:-prefer}
-      POSTGRES_CONNECT_TIMEOUT: ${POSTGRES_CONNECT_TIMEOUT:-10}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      STARTUP_MAX_RETRIES: ${STARTUP_MAX_RETRIES:-20}
-      STARTUP_RETRY_DELAY: ${STARTUP_RETRY_DELAY:-3}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - generated_reports_data:/app/generated_reports
-      - uploads_data:/app/uploads
-      - app_logs_data:/app/app/logs
-      - celerybeat_data:/app/run
     command: ["./start.sh", "api"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/docs', timeout=5)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
       interval: 15s
       timeout: 5s
       retries: 5
 
   celery_worker:
-    build: .
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      ENV: ${ENV:-production}
-      DATABASE_URL: ${DATABASE_URL:-}
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_DB: ${POSTGRES_DB:-desktop_db}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_SSLMODE: ${POSTGRES_SSLMODE:-prefer}
-      POSTGRES_CONNECT_TIMEOUT: ${POSTGRES_CONNECT_TIMEOUT:-10}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      STARTUP_MAX_RETRIES: ${STARTUP_MAX_RETRIES:-20}
-      STARTUP_RETRY_DELAY: ${STARTUP_RETRY_DELAY:-3}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - generated_reports_data:/app/generated_reports
-      - uploads_data:/app/uploads
-      - app_logs_data:/app/app/logs
-      - celerybeat_data:/app/run
+    <<: *app-service
     command: ["./start.sh", "worker"]
 
   celery_beat:
-    build: .
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      ENV: ${ENV:-production}
-      DATABASE_URL: ${DATABASE_URL:-}
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
-      POSTGRES_DB: ${POSTGRES_DB:-desktop_db}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_SSLMODE: ${POSTGRES_SSLMODE:-prefer}
-      POSTGRES_CONNECT_TIMEOUT: ${POSTGRES_CONNECT_TIMEOUT:-10}
-      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      STARTUP_MAX_RETRIES: ${STARTUP_MAX_RETRIES:-20}
-      STARTUP_RETRY_DELAY: ${STARTUP_RETRY_DELAY:-3}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - generated_reports_data:/app/generated_reports
-      - uploads_data:/app/uploads
-      - app_logs_data:/app/app/logs
-      - celerybeat_data:/app/run
+    <<: *app-service
     command: ["./start.sh", "beat"]
 
   nginx:
-    image: nginx:latest
+    image: nginx:1.27-alpine
     restart: unless-stopped
     ports:
       - "${NGINX_PORT:-80}:80"

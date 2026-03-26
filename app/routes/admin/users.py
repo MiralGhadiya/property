@@ -243,14 +243,11 @@ def create_user(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    country = country_service.get_country_by_dial_code(db, dial_code)
-    if not country:
-        country = country_service.create_country(
-            db,
-            name=country_code,
-            dial_code=dial_code,
-            country_code=country_code
-        )
+    country = country_service.get_or_create_country_for_phone(
+        db,
+        dial_code=dial_code,
+        country_code=country_code,
+    )
 
     # Create user
     new_user = User(
@@ -354,14 +351,11 @@ def update_user(
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
-        country = country_service.get_country_by_dial_code(db, dial_code)
-        if not country:
-            country = country_service.create_country(
-                db,
-                name=country_code,
-                dial_code=dial_code,
-                country_code=country_code
-            )
+        country = country_service.get_or_create_country_for_phone(
+            db,
+            dial_code=dial_code,
+            country_code=country_code,
+        )
 
         user.country_id = country.id
 

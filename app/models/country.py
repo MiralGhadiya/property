@@ -17,7 +17,7 @@ class Country(UUIDPrimaryKeyMixin, Base):
     
     name = Column(String, nullable=False)
     country_code = Column(String, unique=True, index=True)
-    dial_code = Column(String)
+    dial_code = Column(String, index=True)
     currency_code = Column(String, nullable=True)  
     
     users = relationship("User", back_populates="country")

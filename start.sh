@@ -45,7 +45,7 @@ run_migrations() {
 
   echo "Running migrations..."
 
-  until alembic upgrade head; do
+  until python -m app.scripts.run_migrations; do
     if [ "$attempt" -ge "$max_retries" ]; then
       echo "Database migrations failed after $attempt attempts."
       exit 1

@@ -1,4 +1,5 @@
 import csv
+
 from sqlalchemy.orm import Session
 
 from app.database.db import SessionLocal
@@ -9,36 +10,38 @@ def import_countries(csv_path: str):
     db: Session = SessionLocal()
 
     try:
-        with open(csv_path, newline='', encoding="utf-8") as csvfile:
+        existing_country_codes = {
+            country_code
+            for (country_code,) in db.query(Country.country_code).all()
+            if country_code
+        }
+
+        with open(csv_path, newline="", encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
 
             for row in reader:
-                # Skip if country_code already exists
-                existing = (
-                    db.query(Country)
-                    .filter(Country.country_code == row["country_code"])
-                    .first()
-                )
+                country_code = row["country_code"].strip()
 
-                if existing:
-                    print(f"Skipping existing country: {row['country_code']}")
+                if country_code in existing_country_codes:
+                    print(f"Skipping existing country: {country_code}")
                     continue
 
-                country = Country(
-                    name=row["name"].strip(),
-                    country_code=row["country_code"].strip(),
-                    dial_code=row.get("dial_code", "").strip(),
-                    currency_code=row.get("currency_code", "").strip() or None,
+                db.add(
+                    Country(
+                        name=row["name"].strip(),
+                        country_code=country_code,
+                        dial_code=row.get("dial_code", "").strip(),
+                        currency_code=row.get("currency_code", "").strip() or None,
+                    )
                 )
-
-                db.add(country)
+                existing_country_codes.add(country_code)
 
             db.commit()
-            print("✅ Countries imported successfully!")
+            print("Countries imported successfully.")
 
     except Exception as e:
         db.rollback()
-        print("❌ Error importing countries:", str(e))
+        print("Error importing countries:", str(e))
 
     finally:
         db.close()

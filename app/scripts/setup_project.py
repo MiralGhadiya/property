@@ -87,28 +87,30 @@ def import_env_variables(db: Session) -> None:
 
 def import_countries(db: Session, csv_path: Path) -> None:
     try:
+        existing_country_codes = {
+            country_code
+            for (country_code,) in db.query(Country.country_code).all()
+            if country_code
+        }
+
         with csv_path.open(newline="", encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
 
             for row in reader:
                 country_code = row["country_code"].strip()
+                dial_code = row.get("dial_code", "").strip()
 
-                existing = (
-                    db.query(Country)
-                    .filter(Country.country_code == country_code)
-                    .first()
-                )
-
-                if existing:
+                if country_code in existing_country_codes:
                     logger.info(f"Skipping existing country: {country_code}")
                     continue
 
                 db.add(Country(
                     name=row["name"].strip(),
                     country_code=country_code,
-                    dial_code=row.get("dial_code", "").strip(),
+                    dial_code=dial_code,
                     currency_code=row.get("currency_code", "").strip() or None,
                 ))
+                existing_country_codes.add(country_code)
 
         # SessionLocal is configured with autoflush disabled, so flush here
         # to make newly imported countries visible to subsequent queries.

@@ -77,11 +77,11 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
     try:
-        country = country_service.get_country_by_dial_code(db, dial_code)
-        if not country:
-            country = country_service.create_country(
-                db, country_code, dial_code, country_code
-            )
+        country = country_service.get_or_create_country_for_phone(
+            db,
+            dial_code=dial_code,
+            country_code=country_code,
+        )
 
         new_user = user_service.create_user(
             db,

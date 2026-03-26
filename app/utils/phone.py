@@ -1,6 +1,7 @@
 import phonenumbers
 from phonenumbers.phonenumberutil import (
     region_code_for_country_code,
+    region_code_for_number,
     NumberParseException,
 )
 from app.utils.logger_config import app_logger as logger
@@ -18,12 +19,16 @@ def get_country_from_mobile(mobile: str):
         if not phonenumbers.is_valid_number(phone):
             raise ValueError("Incorrect country code or invalid phone number")
 
-        country_code = region_code_for_country_code(phone.country_code)
+        country_code = region_code_for_number(phone)
+
+        if not country_code:
+            country_code = region_code_for_country_code(phone.country_code)
+
         if not country_code:
             raise ValueError("Incorrect country code")
 
         dial_code = f"+{phone.country_code}"
-        return dial_code, country_code
+        return dial_code, country_code.upper()
 
     except NumberParseException as e:
         logger.warning(f"Invalid phone number format mobile={mobile}, error={e}")
