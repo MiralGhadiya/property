@@ -13,6 +13,7 @@ from app.models.country import Country
 from app.models.subscription_settings import SubscriptionSettings
 from app.models.system_config import SystemConfig
 from app.scripts.config_seed import load_config_seed_values
+from app.services.subscription_service import add_subscription_plans_from_excel
 from app.utils.logger_config import app_logger as logger
 
 
@@ -20,6 +21,7 @@ load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 COUNTRIES_CSV_PATH = PROJECT_ROOT / "data - data.csv.csv"
+SUBSCRIPTION_PLANS_XLSX_PATH = PROJECT_ROOT / "subscription_plans.xlsx"
 
 SEEDED_MANAGEMENT_USERS = (
     {
@@ -231,6 +233,27 @@ def seed_management_users(db: Session) -> None:
         )
 
 
+def import_subscription_plans(db: Session, excel_path: Path) -> None:
+    if not excel_path.exists():
+        raise FileNotFoundError(
+            f"Subscription plans Excel file not found: {excel_path}"
+        )
+
+    with excel_path.open("rb") as excel_file:
+        created_plans = add_subscription_plans_from_excel(
+            db=db,
+            file=excel_file,
+        )
+
+    if created_plans:
+        logger.info(
+            "Subscription plans import completed "
+            f"created={created_plans}"
+        )
+    else:
+        logger.info("Subscription plans import completed with no new plans created")
+
+
 def run_setup() -> None:
     db: Session = SessionLocal()
 
@@ -257,6 +280,12 @@ def run_setup() -> None:
             db,
             "Seed management users into users table",
             seed_management_users,
+        )
+        run_setup_step(
+            db,
+            "Import subscription plans from subscription_plans.xlsx",
+            import_subscription_plans,
+            SUBSCRIPTION_PLANS_XLSX_PATH,
         )
 
         logger.info("Project setup completed successfully")

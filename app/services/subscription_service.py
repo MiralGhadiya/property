@@ -354,6 +354,103 @@ REQUIRED_COLUMNS = {
 }
 
 
+def _normalize_excel_text(value: object) -> str:
+    if pd.isna(value):
+        return ""
+    return str(value).strip()
+
+
+def _parse_excel_int(
+    value: object,
+    *,
+    field_name: str,
+    country_code: str,
+    plan_name: str,
+) -> int:
+    try:
+        if pd.isna(value):
+            raise ValueError("missing value")
+        return int(float(value))
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            400,
+            f"Invalid {field_name} for {plan_name} in {country_code}",
+        ) from exc
+
+
+def _resolve_plan_type(row) -> str:
+    plan_type = _normalize_excel_text(row.get("plan_type")).upper()
+    if plan_type:
+        return plan_type
+    return _normalize_excel_text(row.get("plan_name")).upper()
+
+
+def _build_plan_payload(
+    row,
+    *,
+    country_code: str,
+    fallback_currency: str,
+) -> dict[str, int | str]:
+    plan_name = _resolve_plan_type(row)
+    currency = _normalize_excel_text(row.get("currency")).upper() or fallback_currency
+
+    if not plan_name:
+        raise HTTPException(400, f"Plan type is required for {country_code}")
+
+    if not currency:
+        raise HTTPException(
+            400,
+            f"Currency is required for {plan_name} in {country_code}",
+        )
+
+    return {
+        "price": _parse_excel_int(
+            row.get("price"),
+            field_name="price",
+            country_code=country_code,
+            plan_name=plan_name,
+        ),
+        "currency": currency,
+        "max_reports": _parse_excel_int(
+            row.get("max_reports"),
+            field_name="max_reports",
+            country_code=country_code,
+            plan_name=plan_name,
+        ),
+    }
+
+
+def _create_subscription_plan(
+    *,
+    db: Session,
+    existing_plans: dict[tuple[str, str], SubscriptionPlan],
+    created_plans: list[str],
+    plan_name: str,
+    country_code: str,
+    payload: dict[str, int | str],
+) -> None:
+    existing_plan = existing_plans.get((country_code, plan_name))
+
+    if existing_plan:
+        logger.info(f"Skipping existing subscription plan {plan_name}-{country_code}")
+        return
+
+    plan = SubscriptionPlan(
+        name=plan_name,
+        country_code=country_code,
+        price=int(payload["price"]),
+        currency=str(payload["currency"]),
+        max_reports=int(payload["max_reports"]),
+        is_active=True,
+    )
+    db.add(plan)
+    existing_plans[(country_code, plan_name)] = plan
+    created_plans.append(
+        "GLOBAL" if country_code == GLOBAL_COUNTRY_CODE and plan_name == "GLOBAL"
+        else f"{plan_name}-{country_code}"
+    )
+
+
 def add_subscription_plans_from_excel(
     *,
     db: Session,
@@ -364,6 +461,7 @@ def add_subscription_plans_from_excel(
         excel_buffer = BytesIO(file_bytes)
 
         df = pd.read_excel(excel_buffer, engine="openpyxl")
+        df.columns = [str(column).strip().lower() for column in df.columns]
 
         if not REQUIRED_COLUMNS.issubset(set(df.columns)):
             raise HTTPException(
@@ -371,111 +469,147 @@ def add_subscription_plans_from_excel(
                 f"Excel must contain columns: {REQUIRED_COLUMNS}",
             )
 
+        df = df[df["country_code"].notna()].copy()
+
+        if df.empty:
+            raise HTTPException(400, "Excel file does not contain any plan rows")
+
+        df["country_code"] = (
+            df["country_code"].map(_normalize_excel_text).str.upper()
+        )
+        df["currency"] = df["currency"].map(_normalize_excel_text)
+        df["plan_type"] = df["plan_type"].map(_normalize_excel_text)
+        df["plan_name"] = df["plan_name"].map(_normalize_excel_text)
+        df = df[df["country_code"] != ""].copy()
+
+        if df.empty:
+            raise HTTPException(400, "Excel file does not contain any valid country codes")
+
         created_plans = []
         global_reference_pro_price = None
         excel_global_plan = None
         country_codes = {
-            str(code).upper()
+            _normalize_excel_text(code).upper()
             for code in df["country_code"].dropna().unique().tolist()
+            if _normalize_excel_text(code)
         }
         country_codes.add(GLOBAL_COUNTRY_CODE)
 
-        existing_plans = {
-            (plan.country_code.upper(), plan.name.upper()): plan
-            for plan in db.query(SubscriptionPlan)
+        existing_plans = {}
+        for plan in (
+            db.query(SubscriptionPlan)
             .filter(SubscriptionPlan.country_code.in_(country_codes))
             .all()
-        }
+        ):
+            existing_plans.setdefault(
+                (plan.country_code.upper(), plan.name.upper()),
+                plan,
+            )
 
         grouped = df.groupby("country_code")
 
         for country_code, group in grouped:
-            country_code = str(country_code).upper()
+            country_code = _normalize_excel_text(country_code).upper()
 
-            if country_code == GLOBAL_COUNTRY_CODE:
-                row = group.iloc[0]
-                excel_global_plan = {
-                    "price": int(row["price"]),
-                    "currency": row["currency"].upper(),
-                    "max_reports": int(row["max_reports"]),
-                }
+            if not country_code:
                 continue
 
-            pro_row = group[group["plan_type"].str.upper() == "PRO"]
-            basic_row = group[group["plan_type"].str.upper() == "BASIC"]
+            sample_row = group.iloc[0]
+            default_currency = _normalize_excel_text(
+                sample_row.get("currency")
+            ).upper()
+            rows_by_plan_type = {}
 
-            if pro_row.empty and basic_row.empty:
+            for _, row in group.iterrows():
+                plan_type = _resolve_plan_type(row)
+
+                if not plan_type:
+                    continue
+
+                rows_by_plan_type[plan_type] = row
+
+            if country_code == GLOBAL_COUNTRY_CODE:
+                global_row = rows_by_plan_type.get("GLOBAL", sample_row)
+                excel_global_plan = _build_plan_payload(
+                    global_row,
+                    country_code=country_code,
+                    fallback_currency=default_currency,
+                )
+                continue
+
+            pro_row = rows_by_plan_type.get("PRO")
+            basic_row = rows_by_plan_type.get("BASIC")
+            master_row = rows_by_plan_type.get("MASTER")
+
+            if pro_row is None and basic_row is None:
                 raise HTTPException(
                     400,
                     f"Either PRO or BASIC must be provided for {country_code}",
                 )
 
-            sample_row = group.iloc[0]
-            currency = sample_row["currency"].upper()
-
-            if not pro_row.empty:
-                pro_price = int(pro_row.iloc[0]["price"])
-                pro_reports = int(pro_row.iloc[0]["max_reports"])
+            if pro_row is not None:
+                pro_payload = _build_plan_payload(
+                    pro_row,
+                    country_code=country_code,
+                    fallback_currency=default_currency,
+                )
             else:
-                basic_price = int(basic_row.iloc[0]["price"])
-                pro_price = int(round(basic_price / 0.6))
-                pro_reports = int(basic_row.iloc[0]["max_reports"])
+                basic_payload = _build_plan_payload(
+                    basic_row,
+                    country_code=country_code,
+                    fallback_currency=default_currency,
+                )
+                pro_payload = {
+                    "price": int(round(int(basic_payload["price"]) / 0.6)),
+                    "currency": str(basic_payload["currency"]),
+                    "max_reports": int(basic_payload["max_reports"]),
+                }
 
-            if not basic_row.empty:
-                basic_price = int(basic_row.iloc[0]["price"])
-                basic_reports = int(basic_row.iloc[0]["max_reports"])
+            if basic_row is not None:
+                basic_payload = _build_plan_payload(
+                    basic_row,
+                    country_code=country_code,
+                    fallback_currency=default_currency,
+                )
             else:
-                basic_price = int(round(pro_price * 0.6))
-                basic_reports = pro_reports
+                basic_payload = {
+                    "price": int(round(int(pro_payload["price"]) * 0.6)),
+                    "currency": str(pro_payload["currency"]),
+                    "max_reports": int(pro_payload["max_reports"]),
+                }
 
-            master_reports = 10
-            master_price = int(round(pro_price * master_reports * 0.8))
+            if master_row is not None:
+                master_payload = _build_plan_payload(
+                    master_row,
+                    country_code=country_code,
+                    fallback_currency=default_currency,
+                )
+            else:
+                master_reports = 10
+                master_payload = {
+                    "price": int(
+                        round(int(pro_payload["price"]) * master_reports * 0.8)
+                    ),
+                    "currency": str(pro_payload["currency"]),
+                    "max_reports": master_reports,
+                }
 
             if global_reference_pro_price is None:
-                global_reference_pro_price = pro_price
+                global_reference_pro_price = int(pro_payload["price"])
 
-            existing_pro = existing_plans.get((country_code, "PRO"))
-            existing_master = existing_plans.get((country_code, "MASTER"))
-            existing_basic = existing_plans.get((country_code, "BASIC"))
-
-            if not existing_master:
-                master_plan = SubscriptionPlan(
-                    name="MASTER",
+            for plan_name, payload in (
+                ("MASTER", master_payload),
+                ("PRO", pro_payload),
+                ("BASIC", basic_payload),
+            ):
+                _create_subscription_plan(
+                    db=db,
+                    existing_plans=existing_plans,
+                    created_plans=created_plans,
+                    plan_name=plan_name,
                     country_code=country_code,
-                    price=master_price,
-                    currency=currency,
-                    max_reports=master_reports,
-                    is_active=True,
+                    payload=payload,
                 )
-                db.add(master_plan)
-                existing_plans[(country_code, "MASTER")] = master_plan
-                created_plans.append(f"MASTER-{country_code}")
-
-            if not existing_pro:
-                pro_plan = SubscriptionPlan(
-                    name="PRO",
-                    country_code=country_code,
-                    price=pro_price,
-                    currency=currency,
-                    max_reports=pro_reports,
-                    is_active=True,
-                )
-                db.add(pro_plan)
-                existing_plans[(country_code, "PRO")] = pro_plan
-                created_plans.append(f"PRO-{country_code}")
-
-            if not existing_basic:
-                basic_plan = SubscriptionPlan(
-                    name="BASIC",
-                    country_code=country_code,
-                    price=basic_price,
-                    currency=currency,
-                    max_reports=basic_reports,
-                    is_active=True,
-                )
-                db.add(basic_plan)
-                existing_plans[(country_code, "BASIC")] = basic_plan
-                created_plans.append(f"BASIC-{country_code}")
 
         existing_global = existing_plans.get((GLOBAL_COUNTRY_CODE, "GLOBAL"))
 

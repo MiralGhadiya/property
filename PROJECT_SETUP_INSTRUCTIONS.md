@@ -233,6 +233,7 @@ That bootstrap will:
 - then seed these management users into the `users` table if they do not already exist:
 - `superadmin@gmail.com` with username `superadmin`, role `SUPER_ADMIN`, and password `superadmin`
 - `admin@gmail.com` with username `admin`, role `ADMIN`, and password `admin`
+- and finally import subscription plans from `subscription_plans.xlsx`
 
 Each bootstrap step is committed before the next one starts, so country-dependent rows are created only after countries are already stored. If data already exists, the bootstrap skips it safely instead of inserting duplicates.
 

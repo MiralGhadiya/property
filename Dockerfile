@@ -20,6 +20,7 @@ COPY app ./app
 COPY alembic.ini ./
 COPY start.sh ./
 COPY ["data - data.csv.csv", "./data - data.csv.csv"]
+COPY ["subscription_plans.xlsx", "./subscription_plans.xlsx"]
 
 RUN mkdir -p /app/generated_reports /app/uploads /app/app/logs /app/run \
     && chmod +x /app/start.sh

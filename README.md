@@ -126,6 +126,7 @@ This script:
 - then seeds these management users into the `users` table if they do not already exist:
 - `superadmin@gmail.com` / `superadmin` / `SUPER_ADMIN`
 - `admin@gmail.com` / `admin` / `ADMIN`
+- and finally imports subscription plans from `subscription_plans.xlsx`
 
 Each bootstrap step is committed before the next one starts, so country-dependent inserts run only after country data is already stored. If matching data already exists, the script skips it safely instead of inserting duplicates.
 
@@ -191,7 +192,7 @@ docker compose logs -f celery_worker
 docker compose logs -f celery_beat
 ```
 
-The API container now bootstraps the project automatically during startup. It imports config values, then countries, then subscription settings, and finally seeds the two management users without duplicating existing data.
+The API container now bootstraps the project automatically during startup. It imports config values, then countries, then subscription settings, then seeds the two management users, and finally imports subscription plans from `subscription_plans.xlsx` without duplicating existing data.
 
 Useful URLs with the default Compose setup:
 
