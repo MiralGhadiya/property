@@ -1,47 +1,42 @@
 # app/routes/valuation.py
 
-import base64
 import uuid
-from uuid import UUID
-from typing import Optional
 from datetime import datetime
+from typing import Optional
 
 from fastapi import (
     APIRouter,
-    HTTPException,
-    UploadFile,
-    File,
     Depends,
+    File,
     Form,
+    HTTPException,
     Query,
     Request,
+    UploadFile,
 )
-from sqlalchemy.orm import Session, undefer_group
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy import or_
+from sqlalchemy.orm import Session, undefer_group
 
-from app.database.db import get_db
 from app.common import PaginatedResponse
+from app.database.db import get_db
 from app.deps import get_current_user, pagination_params
-from app.tasks.valuation_tasks import process_valuation_job, send_report_email_task
-from app.services.subscription_service import get_usable_subscription_with_fallback
-
 from app.models import User, ValuationReport
 from app.models.valuation import (
     DesktopValuationForm,
     ValuationJob,
     desktop_valuation_form_dep,
 )
-from app.utils.maps import geocode_address
+from app.services.subscription_service import get_usable_subscription_with_fallback
+from app.tasks.valuation_tasks import run_valuation_job, send_report_email_direct
 from app.utils.date_filters import filter_by_date_range
 from app.utils.logger_config import app_logger as logger
+from app.utils.maps import geocode_address
 
 
 router = APIRouter()
 
 
-# ==========================================================
-# CREATE VALUATION (QUEUE JOB ONLY)
-# ==========================================================
 @router.post("/create")
 async def create_valuation_form(
     request: Request,
@@ -69,7 +64,6 @@ async def create_valuation_form(
         raise HTTPException(400, "Property address is required")
 
     geo = geocode_address(address)
-
     if not geo or not geo.get("country_code"):
         raise HTTPException(400, "Unable to detect property country")
 
@@ -80,7 +74,6 @@ async def create_valuation_form(
         user_id=current_user.id,
         country_code=detected_country,
     )
-
     if not subscription:
         raise HTTPException(
             status_code=403,
@@ -97,51 +90,39 @@ async def create_valuation_form(
             f"is not valid for property location ({detected_country})"
         )
 
-    country_code = detected_country
-
     job = ValuationJob(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
         subscription_id=subscription.id,
         category=category,
         request_payload=user_input,
-        country_code=country_code,
-        status="queued",
+        country_code=detected_country,
+        status="processing",
     )
 
     try:
         db.add(job)
         db.commit()
-
-        process_valuation_job.delay(job.id)
-
     except Exception:
         db.rollback()
-        logger.exception("Failed queuing valuation job")
+        logger.exception("Failed creating valuation job")
+        raise HTTPException(500, "Failed to create valuation job")
 
-        job.status = "failed"
-        job.error_message = "Queue unavailable"
-        db.add(job)
-        db.commit()
+    try:
+        result = await run_in_threadpool(run_valuation_job, job.id)
+    except Exception:
+        logger.exception(
+            f"Direct valuation generation failed job_id={job.id} user_id={current_user.id}"
+        )
+        raise HTTPException(500, "Failed to generate valuation report")
 
-        raise HTTPException(503, "Valuation service unavailable")
+    if not result:
+        logger.error(f"Valuation completed without response job_id={job.id}")
+        raise HTTPException(500, "Failed to generate valuation report")
 
-    return {
-        "job_id": job.id,
-        "status": "queued",
-        "message": "Valuation job queued successfully",
-        # "subscription_id": str(subscription.id),
-        # "subscription_country": subscription.plan.country_code,
-        # "reports_remaining": (
-        #     None if subscription.plan.max_reports is None
-        #     else subscription.plan.max_reports - subscription.reports_used - 1
-        # ),
-    }
-    
-    
-# ==========================================================
-# MY VALUATIONS
-# ==========================================================
+    return result
+
+
 @router.get(
     "/my-valuations",
     response_model=PaginatedResponse[dict],
@@ -170,15 +151,9 @@ def my_valuations(
     if params["search"]:
         query = query.filter(
             or_(
-                ValuationReport.valuation_id.ilike(
-                    f"%{params['search']}%"
-                ),
-                ValuationReport.category.ilike(
-                    f"%{params['search']}%"
-                ),
-                ValuationReport.country_code.ilike(
-                    f"%{params['search']}%"
-                ),
+                ValuationReport.valuation_id.ilike(f"%{params['search']}%"),
+                ValuationReport.category.ilike(f"%{params['search']}%"),
+                ValuationReport.country_code.ilike(f"%{params['search']}%"),
             )
         )
 
@@ -194,7 +169,7 @@ def my_valuations(
     query = query.order_by(ValuationReport.created_at.desc())
     if params["limit"] is not None:
         query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
-    
+
     records = query.all()
 
     return {
@@ -215,9 +190,6 @@ def my_valuations(
     }
 
 
-# ==========================================================
-# GET SINGLE VALUATION
-# ==========================================================
 @router.get("/valuation/{valuation_id}")
 def get_valuation(
     valuation_id: str,
@@ -248,9 +220,6 @@ def get_valuation(
     }
 
 
-# ==========================================================
-# JOB STATUS (RETURNS OLD RESPONSE FORMAT WHEN DONE)
-# ==========================================================
 @router.get("/jobs/{job_id}")
 def get_job_status(
     job_id: str,
@@ -269,7 +238,6 @@ def get_job_status(
     if not job:
         raise HTTPException(404, "Job not found")
 
-    # Still processing
     if job.status != "completed":
         return {
             "job_id": job.id,
@@ -277,7 +245,6 @@ def get_job_status(
             "error": job.error_message,
         }
 
-    # Completed → return EXACT old response structure
     valuation = (
         db.query(
             ValuationReport.valuation_id,
@@ -292,15 +259,7 @@ def get_job_status(
 
     if not valuation:
         raise HTTPException(404, "Valuation not found")
-    
-    # country = (
-    #     db.query(Country)
-    #     .filter(Country.country_code == valuation.country_code)
-    #     .first()
-    # )
 
-    # currency_code = country.currency_code if country else None
-    
     currency_code = valuation.report_context.get("currency_code")
 
     return {
@@ -318,7 +277,6 @@ async def send_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # 1️⃣ Validate valuation belongs to user
     valuation = (
         db.query(ValuationReport)
         .filter(
@@ -331,25 +289,25 @@ async def send_report(
     if not valuation:
         raise HTTPException(404, "Valuation not found")
 
-    # 2️⃣ Validate file type
     if pdf.content_type != "application/pdf":
         raise HTTPException(400, "Only PDF files are allowed")
 
     content = await pdf.read()
-
-    # 3️⃣ File size limit (5MB)
     if len(content) > 5 * 1024 * 1024:
         raise HTTPException(400, "File too large (max 5MB)")
 
-    # 4️⃣ Encode to Base64 (required because Celery uses JSON serializer)
-    encoded_pdf = base64.b64encode(content).decode("utf-8")
+    try:
+        await run_in_threadpool(
+            send_report_email_direct,
+            valuation_id,
+            current_user.id,
+            content,
+            pdf.filename,
+        )
+    except Exception:
+        logger.exception(
+            f"Direct report email failed valuation_id={valuation_id} user_id={current_user.id}"
+        )
+        raise HTTPException(500, "Failed to send report email")
 
-    # 5️⃣ Push to Celery
-    send_report_email_task.delay(
-        valuation_id,
-        current_user.id,
-        encoded_pdf,
-        pdf.filename,
-    )
-
-    return {"message": "Email queued successfully"}
+    return {"message": "Email sent successfully"}

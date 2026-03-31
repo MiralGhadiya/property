@@ -1,28 +1,28 @@
 # app/tasks/valuation_tasks.py
 
 import io
-import os
 import base64
 import smtplib
-from sqlalchemy import text
 from datetime import datetime, timezone
+
 import matplotlib.pyplot as plt
+from sqlalchemy import text
+
 from app.celery_app import celery_app
 from app.database.db import SessionLocal
-from app.models.valuation import ValuationJob, ValuationReport
-from app.services.subscription_service import increment_usage
-from app.services.valuation_service import save_valuation_report
-from app.services.valuation_report_builder import build_report_context
 from app.llm.openai import (
-    generate_valuation_report,
     generate_forecast,
     generate_swot,
+    generate_valuation_report,
 )
-from app.utils.email import send_pdf_email
-from app.utils.maps import geocode_address, build_static_maps
 from app.models.subscription import UserSubscription
-
+from app.models.valuation import ValuationJob, ValuationReport
+from app.services.subscription_service import increment_usage
+from app.services.valuation_report_builder import build_report_context
+from app.services.valuation_service import save_valuation_report
+from app.utils.email import send_pdf_email
 from app.utils.logger_config import app_logger as logger
+from app.utils.maps import build_static_maps, geocode_address
 
 
 def get_currency_from_country(db, country_code):
@@ -38,6 +38,216 @@ def get_currency_from_country(db, country_code):
         return "USD"
 
     return country.currency_code
+
+
+def _start_valuation_job(job_id: str) -> dict | None:
+    db = SessionLocal()
+
+    try:
+        job = db.query(ValuationJob).filter(ValuationJob.id == job_id).first()
+        if not job:
+            return None
+
+        if job.status == "completed":
+            logger.info(f"Skipping already completed valuation job_id={job_id}")
+            return None
+
+        job.status = "processing"
+        job.error_message = None
+        db.commit()
+
+        subscription = (
+            db.query(UserSubscription)
+            .filter(UserSubscription.id == job.subscription_id)
+            .first()
+        )
+        if not subscription:
+            raise RuntimeError("Subscription not found for job")
+
+        plan_name = subscription.plan.name.upper()
+
+        return {
+            "job_id": job.id,
+            "user_id": job.user_id,
+            "subscription_id": job.subscription_id,
+            "category": job.category,
+            "country_code": job.country_code,
+            "user_input": job.request_payload,
+            "plan_name": plan_name,
+        }
+
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _reserve_valuation_id() -> str:
+    db = SessionLocal()
+
+    try:
+        today = datetime.now(timezone.utc).strftime("%Y%m%d")
+        seq = get_next_valuation_sequence(db)
+        valuation_id = f"DV-{today}-{seq:04d}"
+        db.commit()
+        return valuation_id
+
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _lookup_currency_code(country_code: str | None) -> str:
+    if not country_code:
+        return "USD"
+
+    db = SessionLocal()
+
+    try:
+        return get_currency_from_country(db, country_code) or "USD"
+    finally:
+        db.close()
+
+
+def _finalize_valuation_job(
+    job_context: dict,
+    valuation_id: str,
+    ai_json: dict,
+    context: dict,
+) -> None:
+    db = SessionLocal()
+
+    try:
+        job = (
+            db.query(ValuationJob)
+            .filter(ValuationJob.id == job_context["job_id"])
+            .with_for_update()
+            .first()
+        )
+        if not job:
+            raise RuntimeError("Valuation job not found during finalization")
+
+        subscription = (
+            db.query(UserSubscription)
+            .filter(UserSubscription.id == job_context["subscription_id"])
+            .with_for_update()
+            .first()
+        )
+        if not subscription:
+            raise RuntimeError("Subscription not found during finalization")
+
+        save_valuation_report(
+            db,
+            {
+                "valuation_id": valuation_id,
+                "user_id": job.user_id,
+                "subscription_id": job.subscription_id,
+                "category": job.category,
+                "country_code": job.country_code,
+                "user_fields": job_context["user_input"],
+                "ai_response": ai_json,
+                "report_context": context,
+            },
+        )
+
+        increment_usage(db, subscription, commit=False)
+
+        job.status = "completed"
+        job.valuation_id = valuation_id
+        job.error_message = None
+        db.commit()
+
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def _mark_valuation_job_failed(job_id: str, error_message: str) -> None:
+    db = SessionLocal()
+
+    try:
+        failed_job = db.query(ValuationJob).filter(ValuationJob.id == job_id).first()
+        if not failed_job:
+            return
+
+        failed_job.status = "failed"
+        failed_job.error_message = error_message
+        db.commit()
+
+    except Exception:
+        db.rollback()
+        logger.exception(f"Failed to persist valuation failure state job_id={job_id}")
+    finally:
+        db.close()
+
+
+def _load_valuation_result(job_id: str) -> dict:
+    db = SessionLocal()
+
+    try:
+        job = (
+            db.query(ValuationJob)
+            .filter(ValuationJob.id == job_id)
+            .first()
+        )
+        if not job or not job.valuation_id:
+            raise RuntimeError("Completed valuation job is missing valuation reference")
+
+        valuation = (
+            db.query(ValuationReport)
+            .filter(ValuationReport.valuation_id == job.valuation_id)
+            .first()
+        )
+        if not valuation:
+            raise RuntimeError("Generated valuation report was not found")
+
+        currency_code = None
+        if valuation.report_context:
+            currency_code = valuation.report_context.get("currency_code")
+
+        return {
+            "status": "success",
+            "job_id": job.id,
+            "valuation_id": valuation.valuation_id,
+            "report_context": valuation.report_context,
+            "currency_code": currency_code,
+            "message": "Valuation generated successfully",
+        }
+    finally:
+        db.close()
+
+
+def _load_email_delivery_context(valuation_id: str, user_id: int) -> tuple[str, str | None]:
+    db = SessionLocal()
+
+    try:
+        valuation = (
+            db.query(ValuationReport)
+            .filter(
+                ValuationReport.valuation_id == valuation_id,
+                ValuationReport.user_id == user_id,
+            )
+            .first()
+        )
+
+        if not valuation:
+            raise RuntimeError("Valuation not found or unauthorized")
+
+        client_email = valuation.user_fields.get("email")
+        client_name = valuation.user_fields.get("full_name")
+
+        if not client_email:
+            raise RuntimeError("Client email missing")
+
+        return client_email, client_name
+
+    finally:
+        db.close()
 
 
 def build_calculation_input(user_input: dict):
@@ -90,37 +300,14 @@ def get_next_valuation_sequence(db) -> int:
     return int(db.execute(text("SELECT nextval('valuation_seq')")).scalar())
 
 
-@celery_app.task(
-    bind=True,
-    autoretry_for=(RuntimeError,),
-    retry_backoff=5,
-    retry_kwargs={"max_retries": 2},
-)
-def process_valuation_job(self, job_id: str):
-    db = SessionLocal()
-    job = None
+def run_valuation_job(job_id: str) -> dict | None:
     try:
-        job = db.query(ValuationJob).filter(ValuationJob.id == job_id).first()
-        if not job:
+        job_context = _start_valuation_job(job_id)
+        if not job_context:
             return
 
-        job.status = "processing"
-        db.commit()
-
-        user_input = job.request_payload
-
-        # ai_json = generate_valuation_report(user_input)
-        
-        subscription = (
-            db.query(UserSubscription)
-            .filter(UserSubscription.id == job.subscription_id)
-            .first()
-        )
-        
-        plan_name = subscription.plan.name.upper()
-        
-        # core = generate_valuation_report(user_input, plan=plan_name)
-        
+        user_input = job_context["user_input"]
+        plan_name = job_context["plan_name"]
         calculation_input = build_calculation_input(user_input)
         core = generate_valuation_report(calculation_input, plan=plan_name)
         
@@ -171,13 +358,7 @@ def process_valuation_job(self, job_id: str):
 
         ai_json = core
         ai_json["valuation_validity_days"] = 60
-        # valuation_id = f"DV-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid4())[:8]}"
-        
-        today = datetime.now(timezone.utc).strftime("%Y%m%d")
-
-        seq = get_next_valuation_sequence(db)
-
-        valuation_id = f"DV-{today}-{seq:04d}"
+        valuation_id = _reserve_valuation_id()
                 
         print("AI JSON RESPONSE:", ai_json)
         
@@ -233,7 +414,7 @@ def process_valuation_job(self, job_id: str):
             detected_country = geo.get("country_code")
 
             if detected_country:
-                currency_code = get_currency_from_country(db, detected_country)
+                currency_code = _lookup_currency_code(detected_country)
 
         else:
             context["property_maps"] = None
@@ -267,46 +448,53 @@ def process_valuation_job(self, job_id: str):
         # valuation_id = f"DV-{datetime.utcnow().strftime('%Y%m%d')}-{str(uuid4())[:8]}"
 
         # valuation_id = context["property_identification"]["valuation_id"]
-        save_valuation_report(
-            db,
-            {
-                "valuation_id": valuation_id,
-                "user_id": job.user_id,
-                "subscription_id": job.subscription_id,
-                "category": job.category,
-                "country_code": job.country_code,
-                "user_fields": user_input,
-                "ai_response": ai_json,
-                "report_context": context,
-            },
-        )
-
-        if not subscription:
-            raise RuntimeError("Subscription not found for job")
-
-        increment_usage(db, subscription, commit=False)
-
-        job.status = "completed"
-        job.valuation_id = valuation_id
-        # job.pdf_path = pdf_path
-        db.commit()
+        _finalize_valuation_job(job_context, valuation_id, ai_json, context)
 
         logger.info(f"Valuation completed job_id={job_id}")
+        return _load_valuation_result(job_id)
 
     except Exception as e:
-        db.rollback()
-        failed_job = db.query(ValuationJob).filter(ValuationJob.id == job_id).first()
-        if failed_job:
-            failed_job.status = "failed"
-            failed_job.error_message = str(e)
-            db.commit()
+        _mark_valuation_job_failed(job_id, str(e))
         logger.exception(f"Valuation failed job_id={job_id}")
         raise
-    finally:
-        db.close()
-        
 
         
+@celery_app.task(
+    bind=True,
+    autoretry_for=(RuntimeError,),
+    retry_backoff=5,
+    retry_kwargs={"max_retries": 2},
+)
+def process_valuation_job(self, job_id: str):
+    return run_valuation_job(job_id)
+
+
+def send_report_email_direct(
+    valuation_id: str,
+    user_id,
+    pdf_bytes: bytes,
+    original_filename: str,
+):
+    logger.info(
+        f"Email send started valuation_id={valuation_id} user_id={user_id}"
+    )
+
+    client_email, client_name = _load_email_delivery_context(
+        valuation_id,
+        user_id,
+    )
+
+    send_pdf_email(
+        to_email=client_email,
+        subject="Your Desktop Valuation Report",
+        client_name=client_name,
+        pdf_bytes=pdf_bytes,
+        filename=original_filename,
+    )
+
+    logger.info(f"Email sent successfully valuation_id={valuation_id}")
+
+
 @celery_app.task(
     bind=True,
     autoretry_for=(smtplib.SMTPException, ConnectionError),
@@ -320,52 +508,15 @@ def send_report_email_task(
     pdf_base64: str,
     original_filename: str,
 ):
-    db = SessionLocal()
-    temp_path = None
-
     try:
-        logger.info(
-            f"Email task started valuation_id={valuation_id} user_id={user_id}"
-        )
-
-        valuation = (
-            db.query(ValuationReport)
-            .filter(
-                ValuationReport.valuation_id == valuation_id,
-                ValuationReport.user_id == user_id,
-            )
-            .first()
-        )
-
-        if not valuation:
-            raise RuntimeError("Valuation not found or unauthorized")
-
-        client_email = valuation.user_fields.get("email")
-        client_name = valuation.user_fields.get("full_name")
-
-        if not client_email:
-            raise RuntimeError("Client email missing")
-
         pdf_bytes = base64.b64decode(pdf_base64)
-
-        # safe_filename = f"Valuation_Report_{valuation_id}.pdf"
-
-        send_pdf_email(
-            to_email=client_email,
-            subject="Your Desktop Valuation Report",
-            client_name=client_name,
+        send_report_email_direct(
+            valuation_id=valuation_id,
+            user_id=user_id,
             pdf_bytes=pdf_bytes,
-            filename=original_filename,  
+            original_filename=original_filename,
         )
-
-        logger.info(f"Email sent successfully valuation_id={valuation_id}")
 
     except Exception:
         logger.exception(f"Email sending failed valuation_id={valuation_id}")
         raise
-
-    finally:
-        if temp_path is not None and os.path.exists(temp_path):
-            os.remove(temp_path)
-
-        db.close()

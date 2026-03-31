@@ -10,6 +10,14 @@ from app.utils.logger_config import app_logger as logger
 
 load_dotenv()
 
+
+def get_bool_env(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
 def normalize_database_url(database_url: str) -> str:
     normalized_url = database_url.strip().strip('"').strip("'")
 
@@ -95,6 +103,8 @@ def get_engine_options(database_url: str) -> dict[str, Any]:
     engine_options["pool_size"] = int(os.getenv("DB_POOL_SIZE", "5"))
     engine_options["max_overflow"] = int(os.getenv("DB_MAX_OVERFLOW", "10"))
     engine_options["pool_recycle"] = int(os.getenv("DB_POOL_RECYCLE", "1800"))
+    engine_options["pool_timeout"] = int(os.getenv("DB_POOL_TIMEOUT", "30"))
+    engine_options["pool_use_lifo"] = get_bool_env("DB_POOL_USE_LIFO", True)
 
     return engine_options
 
