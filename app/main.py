@@ -1,8 +1,10 @@
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config_manager import load_config, start_listener_thread
+from app.core.config_manager import get_config, load_config, start_listener_thread
 from app.routes import auth as user_auth, valuation, subscription, payment, user_feedback, inquiry
 from app.routes.admin import (
     auth,
@@ -29,6 +31,28 @@ logger.info("Starting Desktop Valuation API")
 app = FastAPI(title="Desktop Valuation API")
 
 
+def get_cors_origins() -> list[str]:
+    origins = {
+        "https://desktopvaluation.in",
+        "https://admin.desktopvaluation.in",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    }
+
+    for value in (
+        os.getenv("FRONTEND_URL"),
+        os.getenv("ADMIN_FRONTEND_URL"),
+        get_config("FRONTEND_URL", None),
+        get_config("ADMIN_FRONTEND_URL", None),
+    ):
+        if value:
+            origins.add(value.rstrip("/"))
+
+    return sorted(origins)
+
+
 @app.get("/health", tags=["system"])
 def healthcheck():
     return {"status": "ok"}
@@ -53,13 +77,13 @@ async def add_ngrok_header(request: Request, call_next):
 # CORS
 # --------------------------------------------------
 
-#app.add_middleware(
-#    CORSMiddleware,
-#    allow_origins=["*"],
-#    allow_credentials=True,
-#    allow_methods=["*"],
-#    allow_headers=["*"],
-#)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_cors_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --------------------------------------------------
 # Routers (User)
