@@ -20,7 +20,7 @@ from app.routes.admin import (
 
 import app.celery_app
 from app.middleware.ip_country_middleware import IPCountryMiddleware
-from app.middleware.ip_country import get_ip_country, get_client_ip
+from app.middleware.ip_country import get_client_ip
 from app.utils.logger_config import app_logger as logger
 
 
@@ -93,11 +93,14 @@ app.include_router(system_config.router)
 # --------------------------------------------------
 
 @app.middleware("http")
-async def add_ip_country(request: Request, call_next):
-    ip = get_client_ip(request)
-    country = get_ip_country(ip)
+async def log_ip_country_resolution(request: Request, call_next):
+    response: Response = await call_next(request)
 
-    logger.debug(f"Request IP resolved ip={ip} country={country}")
+    if request.url.path != "/health":
+        logger.debug(
+            "Request IP resolved ip=%s country=%s",
+            get_client_ip(request),
+            getattr(request.state, "ip_country", None),
+        )
 
-    request.state.ip_country = country
-    return await call_next(request)
+    return response
