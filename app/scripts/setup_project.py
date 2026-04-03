@@ -1,35 +1,63 @@
 import csv
+import os
+from collections.abc import Callable
+from pathlib import Path
 
-from dotenv import dotenv_values, load_dotenv
+from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 
 from app.database.db import Base, SessionLocal, engine
 from app.models.country import Country
 from app.models.subscription_settings import SubscriptionSettings
 from app.models.system_config import SystemConfig
+from app.scripts.config_seed import load_config_seed_values
 from app.services.bootstrap_service import ensure_default_superusers
+from app.services.subscription_service import add_subscription_plans_from_excel
 from app.utils.logger_config import app_logger as logger
 
 
 load_dotenv()
 
-# Ensure tables exist
-Base.metadata.create_all(bind=engine)
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+COUNTRIES_CSV_PATH = PROJECT_ROOT / "data - data.csv.csv"
+SUBSCRIPTION_PLANS_XLSX_PATH = PROJECT_ROOT / "subscription_plans.xlsx"
 
 
-def import_env_variables(db: Session):
-    env_vars = dotenv_values(".env")
+def ensure_database_schema() -> None:
+    if os.getenv("ENV") != "production":
+        Base.metadata.create_all(bind=engine)
+
+
+def run_setup_step(
+    db: Session,
+    step_name: str,
+    step_function: Callable[..., None],
+    *args,
+) -> None:
+    logger.info("Starting setup step: %s", step_name)
+
+    try:
+        step_function(db, *args)
+        db.commit()
+        logger.info("Completed setup step: %s", step_name)
+    except Exception:
+        db.rollback()
+        logger.exception("Setup step failed: %s", step_name)
+        raise
+
+
+def import_env_variables(db: Session) -> None:
+    env_vars = load_config_seed_values()
 
     for key, value in env_vars.items():
-        if value is None:
-            continue
-
-        existing = db.query(SystemConfig).filter(
-            SystemConfig.config_key == key
-        ).first()
+        existing = (
+            db.query(SystemConfig)
+            .filter(SystemConfig.config_key == key)
+            .first()
+        )
 
         if existing:
-            logger.info(f"Skipping existing config: {key}")
+            logger.info("Skipping existing config: %s", key)
             continue
 
         db.add(
@@ -38,81 +66,131 @@ def import_env_variables(db: Session):
                 config_value=value,
             )
         )
+        logger.info("Inserted config: %s", key)
 
-        logger.info(f"Inserted config: {key}")
 
+def import_countries(db: Session, csv_path: Path) -> None:
+    if not csv_path.exists():
+        raise FileNotFoundError(f"Countries file not found: {csv_path}")
 
-def import_countries(db: Session, csv_path: str):
-    try:
-        with open(csv_path, newline="", encoding="utf-8") as csvfile:
-            reader = csv.DictReader(csvfile)
+    existing_country_codes = {
+        country_code
+        for (country_code,) in db.query(Country.country_code).all()
+        if country_code
+    }
 
-            for row in reader:
-                existing = (
-                    db.query(Country)
-                    .filter(Country.country_code == row["country_code"])
-                    .first()
-                )
+    with csv_path.open(newline="", encoding="utf-8") as csvfile:
+        reader = csv.DictReader(csvfile)
 
-                if existing:
-                    print(f"Skipping existing country: {row['country_code']}")
-                    continue
+        for row in reader:
+            country_code = row["country_code"].strip()
 
-                country = Country(
+            if country_code in existing_country_codes:
+                logger.info("Skipping existing country: %s", country_code)
+                continue
+
+            db.add(
+                Country(
                     name=row["name"].strip(),
-                    country_code=row["country_code"].strip(),
-                    dial_code=row.get("dial_code", "").strip(),
+                    country_code=country_code,
+                    dial_code=row.get("dial_code", "").strip() or None,
                     currency_code=row.get("currency_code", "").strip() or None,
                 )
+            )
+            existing_country_codes.add(country_code)
 
-                db.add(country)
-
-        print("Countries imported")
-
-    except Exception as e:
-        raise Exception(f"Country import failed: {e}")
+    db.flush()
+    logger.info("Country import completed")
 
 
-def setup_subscription_settings(db: Session):
+def setup_subscription_settings(db: Session) -> None:
     existing = db.query(SubscriptionSettings).first()
 
     if existing:
-        print("Subscription settings already exist")
+        logger.info("Subscription settings already exist")
         return
 
-    settings = SubscriptionSettings(
-        id=1,
-        subscription_duration_days=365,
+    db.add(
+        SubscriptionSettings(
+            id=1,
+            subscription_duration_days=365,
+        )
+    )
+    logger.info("Subscription settings created")
+
+
+def seed_default_superusers(db: Session) -> None:
+    result = ensure_default_superusers(db)
+    logger.info(
+        "Default superusers ensured created=%s skipped=%s",
+        result["created"],
+        result["skipped"],
     )
 
-    db.add(settings)
 
-    print("Subscription settings created (365 days)")
+def import_subscription_plans(db: Session, excel_path: Path) -> None:
+    if not excel_path.exists():
+        logger.warning(
+            "Subscription plans Excel file not found. Skipping bootstrap: %s",
+            excel_path,
+        )
+        return
+
+    with excel_path.open("rb") as excel_file:
+        created_plans = add_subscription_plans_from_excel(
+            db=db,
+            file=excel_file,
+        )
+
+    if created_plans:
+        logger.info(
+            "Subscription plans import completed created=%s",
+            created_plans,
+        )
+    else:
+        logger.info("Subscription plans import completed with no new plans created")
 
 
-def run_setup():
+def run_setup() -> None:
+    ensure_database_schema()
     db: Session = SessionLocal()
 
     try:
-        print("Running project setup...")
+        logger.info("Running project setup bootstrap")
 
-        import_env_variables(db)
-        import_countries(db, "data - data.csv.csv")
-        setup_subscription_settings(db)
-        db.commit()
-
-        result = ensure_default_superusers(db)
-        print(
-            "Default superusers ensured "
-            f"(created={result['created']}, skipped={result['skipped']})"
+        run_setup_step(
+            db,
+            "Import environment variables into system_config",
+            import_env_variables,
+        )
+        run_setup_step(
+            db,
+            "Import countries into countries table",
+            import_countries,
+            COUNTRIES_CSV_PATH,
+        )
+        run_setup_step(
+            db,
+            "Create subscription settings",
+            setup_subscription_settings,
+        )
+        run_setup_step(
+            db,
+            "Seed default superusers into users table",
+            seed_default_superusers,
+        )
+        run_setup_step(
+            db,
+            "Import subscription plans into subscription_plans table",
+            import_subscription_plans,
+            SUBSCRIPTION_PLANS_XLSX_PATH,
         )
 
-        print("\nSetup completed successfully!")
-
-    except Exception as e:
+        logger.info("Project setup completed successfully")
+    except Exception:
         db.rollback()
-        print("Setup failed:", str(e))
-
+        logger.exception("Project setup failed")
+        raise
     finally:
         db.close()
 

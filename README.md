@@ -37,15 +37,26 @@
    cd property-main
    ```
 
-2. **Create and activate a virtual environment:**
+2. **Create a virtual environment:**
    ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   python -m venv .venv
    ```
+
+   Optional activation:
+   ```bash
+   source .venv/bin/activate
+   ```
+
+   On Windows PowerShell, you can skip activation entirely and use the launcher scripts below.
 
 3. **Install the dependencies:**
    ```bash
-   pip install -r requirements.txt
+   .venv/bin/python -m pip install -r requirements.txt
+   ```
+
+   On Windows:
+   ```powershell
+   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
    ```
 
 4. **Environment Configuration:**
@@ -73,16 +84,18 @@
 
 5. **Run Database Migrations:**
    ```bash
-   alembic upgrade head
+   .venv/bin/python -m alembic upgrade head
    ```
 
 6. **Initialize Database (Single Script):**
    ```bash
-   python app/scripts/setup_project.py
+   .venv/bin/python -m app.scripts.setup_project
    ```
-   **or**
-   ```bash
-   python -m app.scripts.setup_project
+
+   On Windows:
+   ```powershell
+   .\.venv\Scripts\python.exe -m alembic upgrade head
+   .\.venv\Scripts\python.exe -m app.scripts.setup_project
    ```
 
 ## What the Setup Script Does
@@ -104,17 +117,32 @@ Open separate terminals to run the various components of the architecture:
 
 1. **Start the Celery worker (for background tasks like valuations and emails):**
    ```bash
-   celery -A app.celery_app worker -l info
+   .venv/bin/python -m celery -A app.celery_app worker -l info
+   ```
+
+   On Windows:
+   ```powershell
+   .\worker.cmd
    ```
 
 2. **Start the Celery Beat scheduler (for subscriptions expiry and daily exchange rates):**
    ```bash
-   celery -A app.celery_app beat -l info
+   .venv/bin/python -m celery -A app.celery_app beat -l info
+   ```
+
+   On Windows:
+   ```powershell
+   .\beat.cmd
    ```
 
 3. **Start the FastAPI server:**
    ```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+   ./start.sh
+   ```
+
+   On Windows:
+   ```powershell
+   .\start.cmd
    ```
 
 
