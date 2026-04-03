@@ -1,9 +1,7 @@
 # app/routes/payment.py
 
-import os
 import razorpay
 from uuid import UUID
-from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from dateutil.relativedelta import relativedelta
@@ -18,17 +16,17 @@ from app.core.config_manager import get_config
 
 from app.utils.logger_config import app_logger as logger
 
-load_dotenv()
-
-# RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
-# RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
-
-def get_razorpay_client():
+def get_razorpay_credentials():
     key_id = get_config("RAZORPAY_KEY_ID")
     key_secret = get_config("RAZORPAY_KEY_SECRET")
+    return key_id, key_secret
+
+def get_razorpay_client():
+    key_id, key_secret = get_razorpay_credentials()
 
     if not key_id or not key_secret:
-        raise RuntimeError("Missing Razorpay credentials")
+        logger.warning("Razorpay credentials are missing from config storage and environment")
+        raise HTTPException(503, "Payment gateway is not configured")
 
     return razorpay.Client(auth=(key_id, key_secret))
 
@@ -37,8 +35,6 @@ def get_razorpay_client():
 #     raise RuntimeError("Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET")
 
 router = APIRouter(prefix="/payment", tags=["payment"])
-
-client = get_razorpay_client()
 
 def _pricing_country(request: Request, current_user: User) -> str:
     ip_country = getattr(request.state, "ip_country", None)
@@ -138,6 +134,9 @@ def create_order(
     #     }
 
     try:
+        key_id, _ = get_razorpay_credentials()
+        client = get_razorpay_client()
+
         order = client.order.create({
             "amount": amount,
             "currency": currency,
@@ -164,7 +163,7 @@ def create_order(
 
         return {
             "order_id": order["id"],
-            "razorpay_key": get_razorpay_client().auth[0],
+            "razorpay_key": key_id,
             "amount": amount,
             # "currency": plan.currency,
             "currency": currency,
@@ -180,6 +179,10 @@ def create_order(
         logger.exception("Razorpay server error")
         raise HTTPException(502, "Payment gateway unavailable")
 
+    except HTTPException:
+        db.rollback()
+        raise
+
     except Exception:
         db.rollback()
         logger.exception("Unexpected error during order creation")
@@ -193,6 +196,8 @@ def verify_payment(
     current_user: User = Depends(get_current_user),
 ):
     try:
+        client = get_razorpay_client()
+
         client.utility.verify_payment_signature({
             "razorpay_order_id": data["razorpay_order_id"],
             "razorpay_payment_id": data["razorpay_payment_id"],

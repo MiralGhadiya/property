@@ -1,6 +1,4 @@
 #app/services/subscription_service.py
-
-import pandas as pd
 from io import BytesIO
 from typing import List
 from sqlalchemy import case
@@ -316,6 +314,8 @@ def add_subscription_plans_from_excel(
 ) -> List[str]:
 
     try:
+        import pandas as pd
+
         file_bytes = file.read()
         excel_buffer = BytesIO(file_bytes)
 

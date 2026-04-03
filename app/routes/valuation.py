@@ -23,7 +23,6 @@ from app.database.db import get_db
 from app.common import PaginatedResponse
 from app.deps import get_current_user, pagination_params
 from app.models.country import Country
-from app.tasks.valuation_tasks import process_valuation_job, send_report_email_task
 from app.services.subscription_service import get_usable_subscription_with_fallback
 
 from app.models import User, ValuationReport, subscription
@@ -114,6 +113,7 @@ async def create_valuation_form(
         db.add(job)
         db.commit()
 
+        from app.tasks.valuation_tasks import process_valuation_job
         process_valuation_job.delay(job.id)
 
     except Exception:
@@ -336,6 +336,7 @@ async def send_report(
     encoded_pdf = base64.b64encode(content).decode("utf-8")
 
     # 5️⃣ Push to Celery
+    from app.tasks.valuation_tasks import send_report_email_task
     send_report_email_task.delay(
         valuation_id,
         current_user.id,

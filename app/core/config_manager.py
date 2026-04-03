@@ -1,8 +1,9 @@
 # app/core/config_manager.py
-
+import os
 import time
 from threading import Thread
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import ProgrammingError
 
 from app.database.db import SessionLocal
 from app.core.redis_client import redis_client
@@ -12,16 +13,47 @@ from app.utils.logger_config import app_logger as logger
 
 CONFIG_HASH = "system_config"
 CONFIG_CHANNEL = "config_update_channel"
+_missing_table_logged = False
+_redis_read_fallback_logged = False
+_redis_write_fallback_logged = False
+
+
+def _get_env_config(key: str, default=None):
+    value = os.getenv(key)
+    return value if value not in (None, "") else default
+
+
+def _is_missing_system_config_table(error: Exception) -> bool:
+    message = str(error).lower()
+    return "system_config" in message and "does not exist" in message
 
 
 def load_config():
+    global _missing_table_logged, _redis_write_fallback_logged
     logger.info("Starting config load from database")
 
     db: Session = SessionLocal()
 
     try:
         configs = db.query(SystemConfig).all()
+    except ProgrammingError as e:
+        db.rollback()
+        if _is_missing_system_config_table(e):
+            if not _missing_table_logged:
+                logger.warning(
+                    "system_config table is missing; skipping DB-backed config load. "
+                    "Run Alembic migrations to enable database config."
+                )
+                _missing_table_logged = True
+            return
+        logger.exception(f"Failed to load configs: {e}")
+        return
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Failed to load configs: {e}")
+        return
 
+    try:
         if not configs:
             logger.warning("No system configs found in database")
 
@@ -42,7 +74,12 @@ def load_config():
         )
 
     except Exception as e:
-        logger.exception(f"Failed to load configs: {e}")
+        if not _redis_write_fallback_logged:
+            logger.warning(
+                "Redis is unavailable while caching configs; environment variable "
+                f"fallback will be used. Error: {e}"
+            )
+            _redis_write_fallback_logged = True
 
     finally:
         db.close()
@@ -50,19 +87,26 @@ def load_config():
 
 
 def get_config(key: str, default=None):
+    global _redis_read_fallback_logged
     try:
         value = redis_client.hget(CONFIG_HASH, key)
 
         if value is None:
-            logger.debug(f"Config key '{key}' not found, returning default")
-            return default
+            env_value = _get_env_config(key, default)
+            logger.debug(f"Config key '{key}' not found in Redis, returning fallback")
+            return env_value
 
         logger.debug(f"Config fetch: {key}={value}")
         return value
 
     except Exception as e:
-        logger.exception(f"Redis config read failed for key={key}: {e}")
-        return default
+        if not _redis_read_fallback_logged:
+            logger.warning(
+                "Redis config reads are unavailable; falling back to environment "
+                f"variables. Error: {e}"
+            )
+            _redis_read_fallback_logged = True
+        return _get_env_config(key, default)
 
 
 def start_config_listener():
@@ -88,7 +132,10 @@ def start_config_listener():
             load_config()
 
     except Exception as e:
-        logger.exception(f"Config listener crashed: {e}")
+        logger.warning(
+            "Config listener disabled because Redis is unavailable or misconfigured. "
+            f"Error: {e}"
+        )
 
 
 def start_listener_thread():
