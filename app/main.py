@@ -49,17 +49,18 @@ async def add_ngrok_header(request: Request, call_next):
     response.headers["ngrok-skip-browser-warning"] = "true"
     return response
 
-# --------------------------------------------------
-# CORS
-# --------------------------------------------------
-
-#app.add_middleware(
-#    CORSMiddleware,
-#    allow_origins=["*"],
-#    allow_credentials=True,
-#    allow_methods=["*"],
-#    allow_headers=["*"],
-#)
+# ✅ ADD CORS HERE (top)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://desktopvaluation.in",
+        "https://www.desktopvaluation.in",
+        "https://admin.desktopvaluation.in",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # --------------------------------------------------
 # Routers (User)
