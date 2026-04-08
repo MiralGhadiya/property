@@ -256,7 +256,7 @@ def _build_rental_analysis(ai_json):
         "estimated_annual_rent": rental_raw.get("estimated_annual_rent", 0),
         "rental_yield_percent": rental_raw.get("rental_yield_percent", 0),
         "rental_demand_level": rental_raw.get("rental_demand_level", "N/A"),
-        "average_rent_locality": rental_raw.get("average_rent_locality", 0),
+        "average_rent_locality_per_sqft": rental_raw.get("average_rent_locality_per_sqft", 0),
         "nearby_rental_comparables": rental_raw.get("nearby_rental_comparables", []),
     }
 

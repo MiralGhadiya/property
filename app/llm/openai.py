@@ -121,7 +121,7 @@ BASE_PROMPT = """
           - Estimate annual rent
           - Calculate rental yield
           - Describe rental demand level
-          - Estimate average rent in the locality
+          - Estimate average rent in the locality per sqft
           - Provide 2-3 nearby rental comparables if possible
           
           Currency Rules (MANDATORY):
@@ -329,7 +329,7 @@ CORE_JSON_SCHEMA = """
             "estimated_annual_rent":0,
             "rental_yield_percent":0,
             "rental_demand_level":"",
-            "average_rent_locality":0,
+            "average_rent_locality_per_sqft":0,
             "nearby_rental_comparables":[
               {
                 "address":"",
