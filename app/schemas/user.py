@@ -33,6 +33,7 @@ class UserProfile(BaseModel):
     role: str
     
     subscription_id: Optional[UUID] = None
+    plan_name: Optional[str] = None
     has_active_subscription: bool
 
     class Config:

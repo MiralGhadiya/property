@@ -1,6 +1,8 @@
 # app/routes/auth.py
 import os
+import time
 import secrets
+from typing import Optional
 from sqlalchemy import desc
 from app.auth import pwd_context
 from sqlalchemy.orm import Session
@@ -8,16 +10,18 @@ from sqlalchemy.orm import Session
 
 from google.oauth2 import id_token
 from google.auth.transport import requests
+from jose import jwt
+import requests as py_requests
 
 from dotenv import load_dotenv
 
 from app.core.config_manager import get_config
 load_dotenv()
 
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Form
 
 from app.middleware.ip_country import get_client_ip, get_ip_country
 
@@ -37,7 +41,7 @@ from app.utils.logger_config import app_logger as logger
 
 # BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 def get_base_url():
-    return get_config("BASE_URL", "http://localhost:8000")
+    return os.getenv("BASE_URL") or get_config("BASE_URL", "http://localhost:8000")
 
 datetime.now(timezone.utc)
 
@@ -59,6 +63,125 @@ def verify_google_token(token: str):
     except Exception as e:
         print("Google verification error:", e)
         return None
+
+
+def verify_apple_token(token: str):
+    try:
+        if not token or len(token.split(".")) != 3:
+            logger.error("Apple ID token format is invalid")
+            return None
+            
+        unverified_header = jwt.get_unverified_header(token)
+        kid = unverified_header.get("kid")
+        if not kid:
+            logger.error("Apple ID token header missing 'kid'")
+            return None
+
+        # Fetch keys dynamically from Apple
+        res = py_requests.get("https://appleid.apple.com/auth/keys", timeout=10)
+        if res.status_code != 200:
+            logger.error(f"Failed to fetch Apple public keys: HTTP {res.status_code}")
+            return None
+            
+        keys = res.json().get("keys", [])
+        matching_key = next((k for k in keys if k.get("kid") == kid), None)
+        if not matching_key:
+            logger.error("No matching Apple public key found for kid")
+            return None
+
+        # Determine audience / Services ID from config
+        apple_client_id = get_config("APPLE_SERVICES_ID") or get_config("APPLE_CLIENT_ID")
+        jwt_options = {"verify_at_hash": False}
+        if not apple_client_id:
+            logger.warning("APPLE_SERVICES_ID not configured. Bypassing audience verification.")
+            jwt_options["verify_aud"] = False
+
+        payload = jwt.decode(
+            token,
+            matching_key,
+            algorithms=["RS256"],
+            audience=apple_client_id,
+            issuer="https://appleid.apple.com",
+            options=jwt_options
+        )
+        return payload
+    except Exception as e:
+        logger.error(f"Apple token verification failed: {str(e)}")
+        return None
+
+
+def generate_apple_client_secret():
+    client_id = get_config("APPLE_SERVICES_ID") or get_config("APPLE_CLIENT_ID")
+    team_id = get_config("APPLE_TEAM_ID")
+    key_id = get_config("APPLE_KEY_ID")
+    private_key = get_config("APPLE_PRIVATE_KEY")
+    
+    if not private_key:
+        private_key_path = get_config("APPLE_PRIVATE_KEY_PATH")
+        if private_key_path and os.path.exists(private_key_path):
+            try:
+                with open(private_key_path, "r") as f:
+                    private_key = f.read()
+            except Exception as e:
+                logger.error(f"Failed to read Apple private key from path: {e}")
+
+    if not all([client_id, team_id, key_id, private_key]):
+        logger.error("Missing Apple Sign-In configuration for client secret generation")
+        return None
+        
+    private_key = private_key.replace("\\n", "\n")
+
+    headers = {
+        "kid": key_id
+    }
+    
+    payload = {
+        "iss": team_id,
+        "iat": int(time.time()),
+        "exp": int(time.time()) + 86400 * 180,
+        "aud": "https://appleid.apple.com",
+        "sub": client_id,
+    }
+    
+    try:
+        return jwt.encode(payload, private_key, algorithm="ES256", headers=headers)
+    except Exception as e:
+        logger.error(f"Failed to generate Apple client secret: {e}")
+        return None
+
+
+def exchange_apple_code(code: str, redirect_uri: str = None):
+    client_id = get_config("APPLE_SERVICES_ID") or get_config("APPLE_CLIENT_ID")
+    client_secret = generate_apple_client_secret()
+    
+    if not client_secret:
+        return None
+        
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
+    }
+    
+    data = {
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "code": code,
+        "grant_type": "authorization_code",
+    }
+    
+    if redirect_uri:
+        data["redirect_uri"] = redirect_uri
+    
+    try:
+        res = py_requests.post("https://appleid.apple.com/auth/token", data=data, headers=headers, timeout=10)
+        if res.status_code == 200:
+            return res.json()
+        else:
+            logger.error(f"Apple token exchange failed: {res.status_code} {res.text}")
+            return None
+    except Exception as e:
+        logger.error(f"Error during Apple token exchange: {e}")
+        return None
+
 
 
 @router.post("/register")
@@ -358,29 +481,32 @@ def google_login(
         User.provider_id == google_id
     ).first()
 
-    country_id = None
-    client_ip = get_client_ip(request)
-    print(f"Client IP: {client_ip}")
-
-    country_code = get_ip_country(client_ip)
-    print(f"Country code from IP: {country_code}")
-
-    if country_code:
-        country = country_service.get_country_by_country_code(db, country_code)
-        print(f"Country from DB: {country}")
-
-        if not country:
-            country = country_service.create_country(
-                db,
-                name=country_code,  
-                dial_code=None,        
-                country_code=country_code
-            )
-            print(f"Created new country: {country}")
-
-        country_id = country.id
+    if not user:
+        user = db.query(User).filter(User.email == email).first()
 
     if not user:
+        country_id = None
+        client_ip = get_client_ip(request)
+        print(f"Client IP: {client_ip}")
+
+        country_code = get_ip_country(client_ip)
+        print(f"Country code from IP: {country_code}")
+
+        if country_code:
+            country = country_service.get_country_by_country_code(db, country_code)
+            print(f"Country from DB: {country}")
+
+            if not country:
+                country = country_service.create_country(
+                    db,
+                    name=country_code,  
+                    dial_code=None,        
+                    country_code=country_code
+                )
+                print(f"Created new country: {country}")
+
+            country_id = country.id
+            
         user = User(
             email=email,
             username=name,
@@ -411,7 +537,197 @@ def google_login(
         "refresh_token": refresh_token,
     }
 
-   
+
+@router.post("/apple")
+def apple_login(
+    request: Request,
+    data: schemas.AppleLogin,
+    db: Session = Depends(get_db),
+):
+    id_token = data.id_token
+    if data.code:
+        token_res = exchange_apple_code(data.code)
+        if token_res and "id_token" in token_res:
+            id_token = token_res["id_token"]
+
+    payload = verify_apple_token(id_token)
+
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid Apple token")
+
+    email = payload.get("email") or data.email
+    apple_id = payload.get("sub")
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Apple account has no email")
+
+    # Locate user by Apple provider credentials
+    user = db.query(User).filter(
+        User.provider == "APPLE",
+        User.provider_id == apple_id
+    ).first()
+
+    if not user:
+        user = db.query(User).filter(User.email == email).first()
+
+    if not user:
+        # Determine country of the user based on request IP
+        country_id = None
+        client_ip = get_client_ip(request)
+        logger.info(f"Apple login client IP: {client_ip}")
+
+        country_code = get_ip_country(client_ip)
+        logger.info(f"Apple login country code from IP: {country_code}")
+
+        if country_code:
+            country = country_service.get_country_by_country_code(db, country_code)
+            if not country:
+                country = country_service.create_country(
+                    db,
+                    name=country_code,  
+                    dial_code=None,        
+                    country_code=country_code
+                )
+            country_id = country.id
+
+    if not user:
+        # If frontend sent name details, prioritize it, otherwise default
+        name = data.name or payload.get("name") or email.split("@")[0]
+        
+        user = User(
+            email=email,
+            username=name,
+            mobile_number=f"apple_{apple_id[:10]}",
+            country_id=country_id,
+            hashed_password="APPLE_AUTH",
+            provider="APPLE",
+            provider_id=apple_id,
+            is_email_verified=True,
+            email_verified_at=datetime.now(timezone.utc),
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    access_token = create_access_token({"sub": str(user.id)})
+    refresh_token = create_refresh_token({"sub": str(user.id)})
+
+    auth_service.store_refresh_token(
+        db,
+        user.id,
+        pwd_context.hash(refresh_token),
+        datetime.now(timezone.utc) + timedelta(days=7),
+    )
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+    }
+
+
+@router.post("/auth/apple/callback")
+def apple_callback(
+    request: Request,
+    db: Session = Depends(get_db),
+    id_token: str = Form(...),
+    code: Optional[str] = Form(None),
+    state: Optional[str] = Form(None),
+    user: Optional[str] = Form(None),
+):
+    """
+    Apple Developer Console Redirect Return URL Callback.
+    Handles the POST redirect from Apple, logs in/registers the user, and redirects to frontend.
+    """
+    if code:
+        redirect_uri = f"{get_base_url()}/auth/apple/callback"
+        token_res = exchange_apple_code(code, redirect_uri=redirect_uri)
+        if token_res and "id_token" in token_res:
+            id_token = token_res["id_token"]
+
+    payload = verify_apple_token(id_token)
+
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid Apple token")
+
+    email = payload.get("email")
+    apple_id = payload.get("sub")
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Apple account has no email")
+
+    # Locate user by Apple provider credentials
+    user_record = db.query(User).filter(
+        User.provider == "APPLE",
+        User.provider_id == apple_id
+    ).first()
+
+    if not user_record:
+        user_record = db.query(User).filter(User.email == email).first()
+
+    if not user_record:
+        # Determine country of the user based on request IP
+        country_id = None
+        client_ip = get_client_ip(request)
+        country_code = get_ip_country(client_ip)
+
+        if country_code:
+            country = country_service.get_country_by_country_code(db, country_code)
+            if not country:
+                country = country_service.create_country(
+                    db,
+                    name=country_code,  
+                    dial_code=None,        
+                    country_code=country_code
+                )
+            country_id = country.id
+            
+        # Try to parse user name from the optional JSON user string
+        name = None
+        if user:
+            try:
+                import json
+                user_data = json.loads(user)
+                name_data = user_data.get("name", {})
+                first_name = name_data.get("firstName", "")
+                last_name = name_data.get("lastName", "")
+                name = f"{first_name} {last_name}".strip()
+            except Exception:
+                pass
+        
+        if not name:
+            name = payload.get("name") or email.split("@")[0]
+
+        user_record = User(
+            email=email,
+            username=name,
+            mobile_number=f"apple_{apple_id[:10]}",
+            country_id=country_id,
+            hashed_password="APPLE_AUTH",
+            provider="APPLE",
+            provider_id=apple_id,
+            is_email_verified=True,
+            email_verified_at=datetime.now(timezone.utc),
+        )
+        db.add(user_record)
+        db.commit()
+        db.refresh(user_record)
+
+    access_token = create_access_token({"sub": str(user_record.id)})
+    refresh_token = create_refresh_token({"sub": str(user_record.id)})
+
+    auth_service.store_refresh_token(
+        db,
+        user_record.id,
+        pwd_context.hash(refresh_token),
+        datetime.now(timezone.utc) + timedelta(days=7),
+    )
+
+    # Redirect to the frontend home page with tokens — handled silently by Home.jsx
+    frontend_url = get_config("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    redirect_url = f"{frontend_url}/?access_token={access_token}&refresh_token={refresh_token}"
+    return RedirectResponse(url=redirect_url, status_code=303)
+
+
 @router.post("/refresh", response_model=schemas.TokenResponse)
 def refresh_token(
     data: schemas.RefreshTokenRequest,
@@ -486,11 +802,15 @@ def get_profile(
         .first()
     )
 
+    mobile_number = current_user.mobile_number
+    if current_user.provider == "APPLE" or (mobile_number and mobile_number.startswith("apple_")):
+        mobile_number = "-"
+
     return {
         "id": current_user.id,
         "username": current_user.username,
         "email": current_user.email,
-        "mobile_number": current_user.mobile_number,
+        "mobile_number": mobile_number,
         "country": current_user.country.name if current_user.country else None,
         "role": current_user.role,
         "subscription_id": latest_sub.id if latest_sub else None,
@@ -650,6 +970,8 @@ def reset_password_page(request: Request):
         "reset_password.html",
         {"request": request}
     )
+
+
 
 
 @router.post("/logout")

@@ -88,9 +88,6 @@ def get_my_active_plans(
                 UserSubscription.start_date <= now,
                 UserSubscription.end_date >= now,
                 SubscriptionPlan.is_active == True,
-            ).filter(
-                (SubscriptionPlan.max_reports == None) |
-                (UserSubscription.reports_used < SubscriptionPlan.max_reports)
             )
             .order_by(UserSubscription.end_date.asc())
             .all()
@@ -118,7 +115,7 @@ def get_my_active_plans(
             "reports_used": subscription.reports_used,
             "remaining": (
                 None if subscription.max_reports is None
-                else subscription.max_reports - subscription.reports_used
+                else max(0, subscription.max_reports - subscription.reports_used)
             ),
             "start_date": subscription.start_date,
             "end_date": subscription.end_date,
@@ -261,7 +258,7 @@ def get_default_subscription(
         "plan": sub.plan.name,
         "remaining": (
             None if sub.plan.max_reports is None
-            else sub.plan.max_reports - sub.reports_used
+            else max(0, sub.plan.max_reports - sub.reports_used)
         ),
     }
     

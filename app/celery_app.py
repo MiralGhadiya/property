@@ -12,8 +12,7 @@ load_config()
 
 load_dotenv()
 
-# REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+from app.core.redis_client import REDIS_URL
 
 celery_app = Celery(    
     "app",

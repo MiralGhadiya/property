@@ -44,6 +44,13 @@ class ResendVerificationRequest(BaseModel):
     email: EmailStr
     
 
+class AppleLogin(BaseModel):
+    id_token: str
+    code: Optional[str] = None
+    email: Optional[str] = None
+    name: Optional[str] = None
+
+
 class UserProfile(BaseModel):
     id: int
     username: str

@@ -91,7 +91,10 @@ def get_current_user(
 
     if not user:
         logger.warning(f"Authenticated user not found user_id={user_id}")
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+        )
 
     if not user.is_email_verified:
         logger.warning(f"Unverified email access blocked user_id={user.id}")

@@ -3,7 +3,7 @@ from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config_manager import load_config, start_listener_thread
-from app.routes import auth as user_auth, valuation, subscription, payment, user_feedback, inquiry
+from app.routes import auth as user_auth, valuation, subscription, payment, user_feedback, inquiry, unified_payment
 from app.routes.admin import (
     auth,
     users,
@@ -55,7 +55,15 @@ app.add_middleware(
         "https://desktopvaluation.in",
         "https://www.desktopvaluation.in",
         "https://admin.desktopvaluation.in",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://192.168.1.71:5173",
+        "https://penholder-splicing-audacity.ngrok-free.dev",
+        "*",
     ],
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,6 +78,7 @@ app.include_router(user_auth.router)
 app.include_router(valuation.router)
 app.include_router(subscription.router)
 app.include_router(payment.router)
+app.include_router(unified_payment.router)
 app.include_router(user_feedback.router)
 app.include_router(inquiry.router)
 

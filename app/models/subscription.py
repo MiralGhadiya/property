@@ -74,6 +74,11 @@ class UserSubscription(UUIDPrimaryKeyMixin, Base):
     razorpay_signature = Column(String, nullable=True)
     payment_status = Column(String, default="CREATED")  
     
+    payment_provider = Column(String, nullable=True, index=True)
+    provider_order_id = Column(String, nullable=True, index=True)
+    provider_payment_id = Column(String, nullable=True, index=True)
+    provider_signature = Column(String, nullable=True)
+    
     start_date = Column(DateTime(timezone=True), nullable=True)
     end_date = Column(DateTime(timezone=True), nullable=True)
 

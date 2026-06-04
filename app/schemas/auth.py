@@ -38,3 +38,10 @@ class ResetPassword(BaseModel):
 
 class ResendVerificationRequest(BaseModel):
     email: EmailStr
+
+
+class AppleLogin(BaseModel):
+    id_token: str
+    email: str | None = None
+    name: str | None = None
+

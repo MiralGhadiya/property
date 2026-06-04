@@ -4,6 +4,7 @@ from uuid import UUID
 from typing import Optional
 from datetime import datetime
 from sqlalchemy import case
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 
@@ -322,6 +323,17 @@ def delete_subscription_plan(
     try:
         db.delete(plan)
         db.commit()
+    except IntegrityError:
+        db.rollback()
+        logger.warning(
+            f"IntegrityError: Cannot delete subscription plan plan_id={plan_id} "
+            "because it is referenced by user subscriptions."
+        )
+        raise HTTPException(
+            400,
+            "Cannot delete this plan because users are currently subscribed to it. "
+            "Please deactivate (toggle) the plan status instead to prevent new purchases."
+        )
     except Exception:
         db.rollback()
         logger.exception("Failed to delete subscription plan")
