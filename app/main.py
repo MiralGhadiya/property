@@ -1,3 +1,5 @@
+import time
+
 from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,7 +23,7 @@ from app.routes.admin import (
 import app.celery_app
 from app.middleware.ip_country_middleware import IPCountryMiddleware
 from app.middleware.ip_country import get_client_ip
-from app.utils.logger_config import app_logger as logger
+from app.utils.logger_config import app_logger as logger, shutdown_logging
 
 
 logger.info("Starting Desktop Valuation API")
@@ -40,6 +42,12 @@ def startup_event():
     # auto_reload(10) 
     start_listener_thread()
     logger.info("System configuration loaded")
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    logger.info("Shutting down Desktop Valuation API")
+    shutdown_logging()
 
 
 @app.middleware("http")
@@ -104,12 +112,35 @@ app.include_router(system_config.router)
 
 @app.middleware("http")
 async def log_ip_country_resolution(request: Request, call_next):
-    response: Response = await call_next(request)
+    start_time = time.perf_counter()
+    client_ip = get_client_ip(request)
 
-    if request.url.path != "/health":
-        logger.debug(
-            "Request IP resolved ip=%s country=%s",
-            get_client_ip(request),
+    try:
+        response: Response = await call_next(request)
+    except Exception:
+        logger.exception(
+            "HTTP request failed method=%s path=%s ip=%s country=%s",
+            request.method,
+            request.url.path,
+            client_ip,
+            getattr(request.state, "ip_country", None),
+        )
+        raise
+
+    is_internal_healthcheck = request.url.path == "/health" and client_ip in {
+        "127.0.0.1",
+        "::1",
+    }
+
+    if not is_internal_healthcheck:
+        duration_ms = (time.perf_counter() - start_time) * 1000
+        logger.info(
+            "HTTP request method=%s path=%s status_code=%s duration_ms=%.2f ip=%s country=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            duration_ms,
+            client_ip,
             getattr(request.state, "ip_country", None),
         )
 

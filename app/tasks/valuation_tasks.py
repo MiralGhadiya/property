@@ -179,9 +179,8 @@ def process_valuation_job(self, job_id: str):
 
         valuation_id = f"DV-{today}-{seq:04d}"
                 
-        print("AI JSON RESPONSE:", ai_json)
-        
-        print("FORECAST FROM AI:", ai_json.get("forecast"))
+        logger.debug("AI JSON response generated for job_id=%s", job_id)
+        logger.debug("Forecast generated for job_id=%s forecast=%s", job_id, ai_json.get("forecast"))
     
         context = build_report_context(ai_json, user_input, valuation_id=valuation_id)
         

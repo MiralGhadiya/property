@@ -10,6 +10,7 @@ from app.models import ExchangeRate
 from app.database.db import SessionLocal
 
 from app.core.config_manager import get_config
+from app.utils.logger_config import app_logger as logger
 
 load_dotenv() 
 
@@ -60,11 +61,11 @@ def update_exchange_rates(self):
                 )
                 
         db.commit()
-        print(f"Stored {len(quotes)} exchange rates")
+        logger.info("Stored %s exchange rates", len(quotes))
         
-    except Exception as e:
+    except Exception:
         db.rollback()
-        print(f"Error updating exchange rates: {e}")
+        logger.exception("Error updating exchange rates")
         raise
 
     finally:

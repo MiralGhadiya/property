@@ -98,6 +98,6 @@ def get_client_ip(request: Request) -> str | None:
         logger.warning("request.client is None; defaulting client IP to None")
         client_ip = None
 
-    logger.debug("Client IP resolved from request.client.host")
+    logger.debug(f"Client IP resolved from request.client.host:- {client_ip}")
 
     return client_ip

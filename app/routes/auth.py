@@ -60,8 +60,8 @@ def verify_google_token(token: str):
             clock_skew_in_seconds=10  
         )
         return payload
-    except Exception as e:
-        print("Google verification error:", e)
+    except Exception:
+        logger.warning("Google token verification failed", exc_info=True)
         return None
 
 
@@ -487,14 +487,14 @@ def google_login(
     if not user:
         country_id = None
         client_ip = get_client_ip(request)
-        print(f"Client IP: {client_ip}")
+        logger.info("Google login client IP: %s", client_ip)
 
         country_code = get_ip_country(client_ip)
-        print(f"Country code from IP: {country_code}")
+        logger.info("Google login country code from IP: %s", country_code)
 
         if country_code:
             country = country_service.get_country_by_country_code(db, country_code)
-            print(f"Country from DB: {country}")
+            logger.debug("Google login country lookup result: %s", country)
 
             if not country:
                 country = country_service.create_country(
@@ -503,7 +503,7 @@ def google_login(
                     dial_code=None,        
                     country_code=country_code
                 )
-                print(f"Created new country: {country}")
+                logger.info("Created country from Google login country_code=%s", country_code)
 
             country_id = country.id
 
@@ -513,7 +513,7 @@ def google_login(
                 country = country_service.get_country_by_country_code(db, "IN")
 
             if country:
-                print(f"Defaulting Google login country to India: {country}")
+                logger.info("Defaulting Google login country to India country_id=%s", country.id)
                 country_id = country.id
             
         user = User(
@@ -686,6 +686,7 @@ def apple_callback(
         # Determine country of the user based on request IP
         country_id = None
         client_ip = get_client_ip(request)
+        logger.info(f"Apple client IP /auth/apple/callback:- {client_ip}")
         country_code = get_ip_country(client_ip)
 
         if country_code:

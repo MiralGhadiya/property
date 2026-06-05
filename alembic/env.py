@@ -1,5 +1,4 @@
 from logging.config import fileConfig
-import logging
 
 from alembic import context
 from sqlalchemy import create_engine
@@ -7,8 +6,6 @@ from sqlalchemy import pool
 
 import app.models
 from app.database.db import Base, get_database_connect_args, get_database_url
-
-logging.getLogger("app_logger").disabled = True
 
 
 # this is the Alembic Config object, which provides

@@ -1043,7 +1043,8 @@ Currently supports:
 - Structured logging with timestamps
 - Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 - Log files: `app/logs/` directory
-- Rotating file handlers to prevent disk space issues
+- Daily log files named like `app-2026-06-05.log`
+- Retention cleanup to prevent old logs from filling disk space
 
 **Log Levels**:
 ```python

@@ -70,6 +70,31 @@ If you want Docker Compose to use the bundled `postgres` service, leave `DATABAS
 
 `POSTGRES_SSLMODE`, `POSTGRES_CONNECT_TIMEOUT`, `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, and `DB_POOL_RECYCLE` are also supported for production-style database connections.
 
+Logging can be tuned with these optional variables:
+
+- `LOG_LEVEL` defaults to `DEBUG`
+- `LOG_CONSOLE_LEVEL` defaults to `INFO`
+- `LOG_FILE_LEVEL` defaults to `DEBUG`
+- `LOG_DIR` defaults to `app/logs`
+- `LOG_FILE` defaults to `app.log`, creating daily files like `app-2026-06-05.log`
+- `LOG_FILE_DATE_FORMAT` defaults to `%Y-%m-%d`
+- `LOG_RETENTION_DAYS` defaults to `30`
+- `LOG_TO_CONSOLE` and `LOG_TO_FILE` default to `true`
+
+When running with Docker Compose, `app/logs` is stored in the Docker volume
+`property_app_logs_data`, not directly in the project folder. View today's log
+with:
+
+```bash
+docker compose exec api sh -lc 'ls -lh /app/app/logs && tail -n 100 /app/app/logs/app-$(date +%F).log'
+```
+
+Copy today's log to the project folder with:
+
+```powershell
+docker cp property-api-1:/app/app/logs/app-$(Get-Date -Format yyyy-MM-dd).log .
+```
+
 ## Local Development Setup
 
 1. Create and activate a virtual environment.
