@@ -723,7 +723,7 @@ def apple_callback(
     )
 
     # Redirect to the frontend home page with tokens — handled silently by Home.jsx
-    frontend_url = get_config("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    frontend_url = get_config("FRONTEND_URL", "https://desktopvaluation.in").rstrip("/")
     redirect_url = f"{frontend_url}/?access_token={access_token}&refresh_token={refresh_token}"
     return RedirectResponse(url=redirect_url, status_code=303)
 

@@ -88,6 +88,10 @@ def get_my_active_plans(
                 UserSubscription.start_date <= now,
                 UserSubscription.end_date >= now,
                 SubscriptionPlan.is_active == True,
+            ).filter(
+                (SubscriptionPlan.max_reports == None) |
+                (UserSubscription.reports_used < SubscriptionPlan.max_reports)
+            
             )
             .order_by(UserSubscription.end_date.asc())
             .all()

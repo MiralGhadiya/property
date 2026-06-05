@@ -67,7 +67,7 @@ class PayPalProvider(BasePaymentProvider):
             "Prefer": "return=representation"
         }
 
-        base_api_url = get_config("BASE_URL") or "http://localhost:8000/"
+        base_api_url = get_config("BASE_URL") or "https://api.desktopvaluation.in"
         base_api_url = base_api_url.rstrip("/")
         return_url = f"{base_api_url}/payment/unified/callback?status=success"
         cancel_url = f"{base_api_url}/payment/unified/callback?status=cancel"
@@ -144,11 +144,19 @@ class PayPalProvider(BasePaymentProvider):
                     issue = details[0].get("issue")
                     description = details[0].get("description")
                     logger.error(f"PayPal Order Creation Rejected: issue={issue}, description={description}")
+                    if issue == "CURRENCY_NOT_SUPPORTED":
+                        raise HTTPException(
+                            400,
+                            f"PayPal does not support domestic transactions in '{currency.upper()}'. "
+                            "Please select Razorpay instead to complete your transaction."
+                        )
                     raise HTTPException(400, f"PayPal error: {issue} - {description}")
                 else:
                     message = err_data.get("message", "Unknown PayPal error")
                     logger.error(f"PayPal Order Creation Rejected: {message}")
                     raise HTTPException(400, f"PayPal error: {message}")
+            except HTTPException:
+                raise
             except (ValueError, AttributeError, KeyError, IndexError):
                 logger.exception("PayPal order creation failed with HTTP error")
                 raise HTTPException(502, f"PayPal error status: {e.response.status_code}")

@@ -50,6 +50,12 @@ def create_unified_order(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if body.provider.upper() == "PAYONEER":
+        raise HTTPException(
+            status_code=400,
+            detail="Payoneer is currently unavailable. Please use Razorpay or PayPal instead to complete your transaction."
+        )
+
     plan = db.query(SubscriptionPlan).filter(
         SubscriptionPlan.id == plan_id,
         SubscriptionPlan.is_active == True
@@ -125,6 +131,12 @@ def verify_unified_payment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if body.provider.upper() == "PAYONEER":
+        raise HTTPException(
+            status_code=400,
+            detail="Payoneer is currently unavailable. Please use Razorpay or PayPal instead to complete your transaction."
+        )
+
     try:
         # Resolve target payload dynamically for polymorphic providers
         target_payload = {}
