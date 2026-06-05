@@ -506,6 +506,15 @@ def google_login(
                 print(f"Created new country: {country}")
 
             country_id = country.id
+
+        if country_id is None:
+            country = country_service.get_country_by_name(db, "India")
+            if not country:
+                country = country_service.get_country_by_country_code(db, "IN")
+
+            if country:
+                print(f"Defaulting Google login country to India: {country}")
+                country_id = country.id
             
         user = User(
             email=email,

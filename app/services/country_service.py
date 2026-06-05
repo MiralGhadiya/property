@@ -64,3 +64,11 @@ def get_country_by_country_code(db: Session, country_code: str):
     return db.query(Country).filter(
         Country.country_code == country_code
     ).first()
+
+
+def get_country_by_name(db: Session, name: str):
+    logger.debug(f"Looking up country by name={name}")
+
+    return db.query(Country).filter(
+        Country.name.ilike(name)
+    ).first()
