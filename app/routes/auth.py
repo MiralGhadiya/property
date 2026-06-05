@@ -2,36 +2,44 @@
 import os
 import secrets
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import requests as py_requests
 from dotenv import load_dotenv
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from google.auth.transport import requests
 from google.oauth2 import id_token
 from jose import jwt
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from app.auth import pwd_context
-from app.core.config_manager import get_config
-
-from datetime import datetime, timedelta, timezone
-
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
-
 from app import schemas
-from app.auth import create_access_token, create_refresh_token, verify_password
+from app.auth import (
+    create_access_token,
+    create_refresh_token,
+    pwd_context,
+    verify_password,
+)
+from app.core.config_manager import get_config
 from app.deps import get_current_user, get_db
 from app.middleware.ip_country import get_client_ip, get_ip_country
-from app.models import EmailVerificationToken, PasswordResetToken, SubscriptionPlan, User, UserSubscription
+from app.models import (
+    EmailVerificationToken,
+    PasswordResetToken,
+    SubscriptionPlan,
+    User,
+    UserSubscription,
+)
 from app.services import auth_service, country_service, user_service
 from app.utils.email import send_reset_email, send_verification_email
 from app.utils.logger_config import app_logger as logger
 from app.utils.phone import get_country_from_mobile
 
 load_dotenv()
+
 
 # BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 def get_base_url():
@@ -85,10 +93,14 @@ def verify_apple_token(token: str):
             return None
 
         # Determine audience / Services ID from config
-        apple_client_id = get_config("APPLE_SERVICES_ID") or get_config("APPLE_CLIENT_ID")
+        apple_client_id = get_config("APPLE_SERVICES_ID") or get_config(
+            "APPLE_CLIENT_ID"
+        )
         jwt_options = {"verify_at_hash": False}
         if not apple_client_id:
-            logger.warning("APPLE_SERVICES_ID not configured. Bypassing audience verification.")
+            logger.warning(
+                "APPLE_SERVICES_ID not configured. Bypassing audience verification."
+            )
             jwt_options["verify_aud"] = False
 
         payload = jwt.decode(
@@ -163,7 +175,12 @@ def exchange_apple_code(code: str, redirect_uri: str = None):
         data["redirect_uri"] = redirect_uri
 
     try:
-        res = py_requests.post("https://appleid.apple.com/auth/token", data=data, headers=headers, timeout=10)
+        res = py_requests.post(
+            "https://appleid.apple.com/auth/token",
+            data=data,
+            headers=headers,
+            timeout=10,
+        )
         if res.status_code == 200:
             return res.json()
         else:
@@ -238,7 +255,9 @@ def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
         db.commit()
 
         try:
-            send_verification_email(new_user.email, f"{get_base_url()}/verify-email?token={raw_token}")
+            send_verification_email(
+                new_user.email, f"{get_base_url()}/verify-email?token={raw_token}"
+            )
         except Exception:
             logger.exception("Failed to send verification email")
 
@@ -257,11 +276,16 @@ def verify_email_page(token: str, request: Request, db: Session = Depends(get_db
 
     tokens = (
         db.query(EmailVerificationToken)
-        .filter(EmailVerificationToken.used == False, EmailVerificationToken.expires_at > datetime.now(timezone.utc))
+        .filter(
+            EmailVerificationToken.used == False,
+            EmailVerificationToken.expires_at > datetime.now(timezone.utc),
+        )
         .all()
     )
 
-    verification = next((t for t in tokens if pwd_context.verify(token, t.token_hash)), None)
+    verification = next(
+        (t for t in tokens if pwd_context.verify(token, t.token_hash)), None
+    )
 
     if verification:
         user = db.query(User).filter(User.id == verification.user_id).first()
@@ -290,7 +314,9 @@ def verify_email_page(token: str, request: Request, db: Session = Depends(get_db
 
 @router.get("/resend-verification-page", response_class=HTMLResponse)
 def resend_verification_page(request: Request):
-    return templates.TemplateResponse("emails/resend_verification.html", {"request": request})
+    return templates.TemplateResponse(
+        "emails/resend_verification.html", {"request": request}
+    )
 
 
 @router.post("/resend-verification")
@@ -301,7 +327,9 @@ def resend_verification_email(
     user = db.query(User).filter(User.email == data.email).first()
 
     if not user:
-        return {"message": "If this email is registered, a verification link has been sent"}
+        return {
+            "message": "If this email is registered, a verification link has been sent"
+        }
 
     if user.is_email_verified:
         raise HTTPException(status_code=400, detail="Email is already verified")
@@ -387,7 +415,9 @@ def login(user: schemas.UserLogin, db: Session = Depends(get_db)):
         db_user = user_service.get_user_by_email(db, user.email)
 
         if db_user and db_user.provider != "LOCAL":
-            raise HTTPException(status_code=400, detail="This account uses Google login")
+            raise HTTPException(
+                status_code=400, detail="This account uses Google login"
+            )
 
         if not db_user:
             logger.info(f"Login failed: user not found email={user.email}")
@@ -450,7 +480,11 @@ def google_login(
     #         detail="This email is already registered"
     #     )
 
-    user = db.query(User).filter(User.provider == "GOOGLE", User.provider_id == google_id).first()
+    user = (
+        db.query(User)
+        .filter(User.provider == "GOOGLE", User.provider_id == google_id)
+        .first()
+    )
 
     if not user:
         user = db.query(User).filter(User.email == email).first()
@@ -471,7 +505,9 @@ def google_login(
                 country = country_service.create_country(
                     db, name=country_code, dial_code=None, country_code=country_code
                 )
-                logger.info("Created country from Google login country_code=%s", country_code)
+                logger.info(
+                    "Created country from Google login country_code=%s", country_code
+                )
 
             country_id = country.id
 
@@ -481,7 +517,9 @@ def google_login(
                 country = country_service.get_country_by_country_code(db, "IN")
 
             if country:
-                logger.info("Defaulting Google login country to India country_id=%s", country.id)
+                logger.info(
+                    "Defaulting Google login country to India country_id=%s", country.id
+                )
                 country_id = country.id
 
         user = User(
@@ -539,7 +577,11 @@ def apple_login(
         raise HTTPException(status_code=400, detail="Apple account has no email")
 
     # Locate user by Apple provider credentials
-    user = db.query(User).filter(User.provider == "APPLE", User.provider_id == apple_id).first()
+    user = (
+        db.query(User)
+        .filter(User.provider == "APPLE", User.provider_id == apple_id)
+        .first()
+    )
 
     if not user:
         user = db.query(User).filter(User.email == email).first()
@@ -636,7 +678,11 @@ def apple_callback(
         raise HTTPException(status_code=400, detail="Apple account has no email")
 
     # Locate user by Apple provider credentials
-    user_record = db.query(User).filter(User.provider == "APPLE", User.provider_id == apple_id).first()
+    user_record = (
+        db.query(User)
+        .filter(User.provider == "APPLE", User.provider_id == apple_id)
+        .first()
+    )
 
     if not user_record:
         user_record = db.query(User).filter(User.email == email).first()
@@ -700,7 +746,9 @@ def apple_callback(
 
     # Redirect to the frontend home page with tokens — handled silently by Home.jsx
     frontend_url = get_config("FRONTEND_URL", "https://desktopvaluation.in").rstrip("/")
-    redirect_url = f"{frontend_url}/?access_token={access_token}&refresh_token={refresh_token}"
+    redirect_url = (
+        f"{frontend_url}/?access_token={access_token}&refresh_token={refresh_token}"
+    )
     return RedirectResponse(url=redirect_url, status_code=303)
 
 
@@ -723,7 +771,6 @@ def refresh_token(
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
     try:
-
         token_record.is_revoked = True
 
         access_token = create_access_token({"sub": str(token_record.user_id)})
@@ -767,7 +814,9 @@ def get_profile(
     )
 
     mobile_number = current_user.mobile_number
-    if current_user.provider == "APPLE" or (mobile_number and mobile_number.startswith("apple_")):
+    if current_user.provider == "APPLE" or (
+        mobile_number and mobile_number.startswith("apple_")
+    ):
         mobile_number = "-"
 
     return {
@@ -785,7 +834,9 @@ def get_profile(
 
 @router.put("/edit-profile")
 def update_profile(
-    data: schemas.UserUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    data: schemas.UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
 
     if data.email and data.email != current_user.email:
@@ -833,7 +884,9 @@ def change_password(
         raise HTTPException(status_code=400, detail="Passwords do not match")
 
     try:
-        user_service.change_password(db, current_user, data.old_password, data.new_password)
+        user_service.change_password(
+            db, current_user, data.old_password, data.new_password
+        )
     except ValueError:
         raise HTTPException(status_code=401, detail="Old password is incorrect")
 
@@ -847,14 +900,17 @@ def forgot_password(data: schemas.ForgotPassword, db: Session = Depends(get_db))
 
     if not user:
         raise HTTPException(
-            status_code=404, detail="This email is not registered. Please enter your registered email id"
+            status_code=404,
+            detail="This email is not registered. Please enter your registered email id",
         )
 
     raw_token = secrets.token_urlsafe(48)
     hashed_token = pwd_context.hash(raw_token)
 
     reset = PasswordResetToken(
-        user_id=user.id, token_hash=hashed_token, expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
+        user_id=user.id,
+        token_hash=hashed_token,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
     )
 
     try:
@@ -871,7 +927,9 @@ def forgot_password(data: schemas.ForgotPassword, db: Session = Depends(get_db))
 
     logger.info(f"Password reset requested for email={user.email}")
 
-    return {"message": "If email is registered, a password reset link has been sent. Please check your inbox."}
+    return {
+        "message": "If email is registered, a password reset link has been sent. Please check your inbox."
+    }
 
 
 @router.post("/reset-password")
@@ -882,11 +940,16 @@ def reset_password(data: schemas.ResetPassword, db: Session = Depends(get_db)):
 
     tokens = (
         db.query(PasswordResetToken)
-        .filter(PasswordResetToken.used == False, PasswordResetToken.expires_at > datetime.now(timezone.utc))
+        .filter(
+            PasswordResetToken.used == False,
+            PasswordResetToken.expires_at > datetime.now(timezone.utc),
+        )
         .all()
     )
 
-    reset_token = next((t for t in tokens if pwd_context.verify(data.token, t.token_hash)), None)
+    reset_token = next(
+        (t for t in tokens if pwd_context.verify(data.token, t.token_hash)), None
+    )
 
     if not reset_token:
         raise HTTPException(status_code=400, detail="Invalid or expired token")

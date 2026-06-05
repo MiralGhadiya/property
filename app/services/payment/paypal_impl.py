@@ -18,7 +18,11 @@ def get_paypal_config():
     if not client_id or not client_secret:
         raise RuntimeError("Missing PayPal credentials")
 
-    base_url = "https://api-m.paypal.com" if mode.lower() == "live" else "https://api-m.sandbox.paypal.com"
+    base_url = (
+        "https://api-m.paypal.com"
+        if mode.lower() == "live"
+        else "https://api-m.sandbox.paypal.com"
+    )
     return client_id, client_secret, base_url
 
 
@@ -72,7 +76,10 @@ class PayPalProvider(BasePaymentProvider):
             "intent": "CAPTURE",
             "purchase_units": [
                 {
-                    "amount": {"currency_code": currency.upper(), "value": formatted_amount},
+                    "amount": {
+                        "currency_code": currency.upper(),
+                        "value": formatted_amount,
+                    },
                     "description": f"Desktop Valuation Plan: {plan.name}",
                 }
             ],
@@ -85,7 +92,12 @@ class PayPalProvider(BasePaymentProvider):
         }
 
         try:
-            response = requests.post(f"{base_url}/v2/checkout/orders", json=payload, headers=headers, timeout=10)
+            response = requests.post(
+                f"{base_url}/v2/checkout/orders",
+                json=payload,
+                headers=headers,
+                timeout=10,
+            )
             response.raise_for_status()
             order_data = response.json()
             order_id = order_data["id"]
@@ -116,7 +128,10 @@ class PayPalProvider(BasePaymentProvider):
                 "order_id": order_id,
                 "amount": amount,
                 "currency": currency,
-                "checkout_payload": {"order_id": order_id, "links": order_data.get("links", [])},
+                "checkout_payload": {
+                    "order_id": order_id,
+                    "links": order_data.get("links", []),
+                },
             }
 
         except requests.exceptions.HTTPError as e:
@@ -127,7 +142,9 @@ class PayPalProvider(BasePaymentProvider):
                 if details:
                     issue = details[0].get("issue")
                     description = details[0].get("description")
-                    logger.error(f"PayPal Order Creation Rejected: issue={issue}, description={description}")
+                    logger.error(
+                        f"PayPal Order Creation Rejected: issue={issue}, description={description}"
+                    )
                     if issue == "CURRENCY_NOT_SUPPORTED":
                         raise HTTPException(
                             400,
@@ -143,10 +160,14 @@ class PayPalProvider(BasePaymentProvider):
                 raise
             except (ValueError, AttributeError, KeyError, IndexError):
                 logger.exception("PayPal order creation failed with HTTP error")
-                raise HTTPException(502, f"PayPal error status: {e.response.status_code}")
+                raise HTTPException(
+                    502, f"PayPal error status: {e.response.status_code}"
+                )
         except requests.exceptions.RequestException:
             db.rollback()
-            logger.exception("PayPal order creation failed due to network request error")
+            logger.exception(
+                "PayPal order creation failed due to network request error"
+            )
             raise HTTPException(502, "PayPal gateway connection failure")
         except Exception:
             db.rollback()
@@ -161,7 +182,11 @@ class PayPalProvider(BasePaymentProvider):
         if not paypal_order_id:
             raise HTTPException(400, "Missing required PayPal order ID")
 
-        sub = db.query(UserSubscription).filter(UserSubscription.provider_order_id == paypal_order_id).first()
+        sub = (
+            db.query(UserSubscription)
+            .filter(UserSubscription.provider_order_id == paypal_order_id)
+            .first()
+        )
 
         if not sub:
             raise HTTPException(404, "Subscription not found")
@@ -169,19 +194,31 @@ class PayPalProvider(BasePaymentProvider):
         if str(sub.user_id) != str(user_id):
             raise HTTPException(403, "This subscription belongs to a different user")
 
-        headers = {"Content-Type": "application/json", "Authorization": f"Bearer {token}"}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        }
 
         try:
             # Execute backend-to-backend capture call
             response = requests.post(
-                f"{base_url}/v2/checkout/orders/{paypal_order_id}/capture", json={}, headers=headers, timeout=15
+                f"{base_url}/v2/checkout/orders/{paypal_order_id}/capture",
+                json={},
+                headers=headers,
+                timeout=15,
             )
 
             # If already captured, we handle it gracefully or fetch the details
             if response.status_code == 422:
                 # Let's inspect if order was already captured
-                logger.warning(f"PayPal order {paypal_order_id} capture returned 422, fetching details")
-                response = requests.get(f"{base_url}/v2/checkout/orders/{paypal_order_id}", headers=headers, timeout=10)
+                logger.warning(
+                    f"PayPal order {paypal_order_id} capture returned 422, fetching details"
+                )
+                response = requests.get(
+                    f"{base_url}/v2/checkout/orders/{paypal_order_id}",
+                    headers=headers,
+                    timeout=10,
+                )
                 response.raise_for_status()
                 order_data = response.json()
             else:
@@ -190,7 +227,9 @@ class PayPalProvider(BasePaymentProvider):
 
             status = order_data.get("status")
             if status != "COMPLETED":
-                raise HTTPException(400, f"PayPal payment status is not completed: {status}")
+                raise HTTPException(
+                    400, f"PayPal payment status is not completed: {status}"
+                )
 
             capture_id = None
             purchase_units = order_data.get("purchase_units", [])
@@ -213,7 +252,9 @@ class PayPalProvider(BasePaymentProvider):
                 if details:
                     issue = details[0].get("issue")
                     description = details[0].get("description")
-                    logger.error(f"PayPal Verification Rejected: issue={issue}, description={description}")
+                    logger.error(
+                        f"PayPal Verification Rejected: issue={issue}, description={description}"
+                    )
                     raise HTTPException(400, f"PayPal error: {issue} - {description}")
                 else:
                     message = err_data.get("message", "Unknown PayPal error")
@@ -221,9 +262,13 @@ class PayPalProvider(BasePaymentProvider):
                     raise HTTPException(400, f"PayPal error: {message}")
             except (ValueError, AttributeError, KeyError, IndexError):
                 logger.exception("PayPal verification failed with HTTP error")
-                raise HTTPException(502, f"PayPal verification error status: {e.response.status_code}")
+                raise HTTPException(
+                    502, f"PayPal verification error status: {e.response.status_code}"
+                )
         except requests.exceptions.RequestException:
-            logger.exception("PayPal payment capture/verification failed due to network request error")
+            logger.exception(
+                "PayPal payment capture/verification failed due to network request error"
+            )
             raise HTTPException(502, "PayPal gateway verification connection failure")
         except HTTPException:
             raise

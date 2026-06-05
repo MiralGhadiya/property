@@ -21,18 +21,28 @@ router = APIRouter(prefix="/payment/unified", tags=["payments"])
 
 
 class UnifiedCreateOrderRequest(BaseModel):
-    provider: str = Field(..., description="Payment provider name: RAZORPAY | PAYPAL | PAYONEER")
+    provider: str = Field(
+        ..., description="Payment provider name: RAZORPAY | PAYPAL | PAYONEER"
+    )
 
 
 class UnifiedVerifyPaymentRequest(BaseModel):
-    provider: str = Field(..., description="Payment provider name: RAZORPAY | PAYPAL | PAYONEER")
+    provider: str = Field(
+        ..., description="Payment provider name: RAZORPAY | PAYPAL | PAYONEER"
+    )
 
     # Flat parameters for premium flat structure
     razorpay_order_id: Optional[str] = Field(None, description="Razorpay Order ID")
     razorpay_payment_id: Optional[str] = Field(None, description="Razorpay Payment ID")
-    razorpay_signature: Optional[str] = Field(None, description="Cryptographic signature from Razorpay")
-    paypal_order_id: Optional[str] = Field(None, description="PayPal Sandbox/Live Order ID")
-    payoneer_intent_id: Optional[str] = Field(None, description="Payoneer checkout intent ID")
+    razorpay_signature: Optional[str] = Field(
+        None, description="Cryptographic signature from Razorpay"
+    )
+    paypal_order_id: Optional[str] = Field(
+        None, description="PayPal Sandbox/Live Order ID"
+    )
+    payoneer_intent_id: Optional[str] = Field(
+        None, description="Payoneer checkout intent ID"
+    )
 
 
 def _pricing_country(request: Request, current_user: User) -> str:
@@ -55,7 +65,11 @@ def create_unified_order(
             detail="Payoneer is currently unavailable. Please use Razorpay or PayPal instead to complete your transaction.",
         )
 
-    plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == plan_id, SubscriptionPlan.is_active == True).first()
+    plan = (
+        db.query(SubscriptionPlan)
+        .filter(SubscriptionPlan.id == plan_id, SubscriptionPlan.is_active == True)
+        .first()
+    )
 
     if not plan:
         raise HTTPException(404, "Plan not found")
@@ -157,7 +171,9 @@ def verify_unified_payment(
 
         # Resolve polymorphic provider subclass and verify
         provider = PaymentProviderFactory.get_provider(body.provider)
-        result = provider.verify_payment(db=db, payload=target_payload, user_id=current_user.id)
+        result = provider.verify_payment(
+            db=db, payload=target_payload, user_id=current_user.id
+        )
 
         sub = result["subscription"]
 
@@ -179,7 +195,10 @@ def verify_unified_payment(
             db.commit()
             db.refresh(settings)
 
-        if not settings.subscription_duration_days or settings.subscription_duration_days <= 0:
+        if (
+            not settings.subscription_duration_days
+            or settings.subscription_duration_days <= 0
+        ):
             settings.subscription_duration_days = 365
             db.commit()
             db.refresh(settings)
@@ -316,11 +335,15 @@ def payment_callback(status: str):
         <body>
             <div class="card">
                 <div class="icon-container">
-                    {'''<svg class="icon" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    {
+        '''<svg class="icon" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>''' if is_success else '''<svg class="icon" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    </svg>'''
+        if is_success
+        else '''<svg class="icon" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>'''}
+                    </svg>'''
+    }
                 </div>
                 <h1>{title_text}</h1>
                 <p>{description_text}</p>

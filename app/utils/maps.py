@@ -49,7 +49,12 @@ def geocode_address(address: str):
 def find_place(address: str):
     url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
 
-    params = {"input": address, "inputtype": "textquery", "fields": "place_id,photos", "key": get_maps_key()}
+    params = {
+        "input": address,
+        "inputtype": "textquery",
+        "fields": "place_id,photos",
+        "key": get_maps_key(),
+    }
 
     r = requests.get(url, params=params, timeout=10)
     data = r.json()
@@ -73,7 +78,9 @@ def get_place_photo(address: str):
         return None
 
     photo = random.choice(photos)
-    logger.info(f"Selected photo reference: {photo['photo_reference']} for address: {address}")
+    logger.info(
+        f"Selected photo reference: {photo['photo_reference']} for address: {address}"
+    )
 
     ref = photo["photo_reference"]
     logger.info(f"Fetching photo for reference: {ref}")
@@ -99,7 +106,12 @@ def get_place_photo(address: str):
 def get_streetview_metadata(lat, lng):
     url = "https://maps.googleapis.com/maps/api/streetview/metadata"
 
-    params = {"location": f"{lat},{lng}", "radius": 200, "source": "outdoor", "key": get_maps_key()}
+    params = {
+        "location": f"{lat},{lng}",
+        "radius": 200,
+        "source": "outdoor",
+        "key": get_maps_key(),
+    }
 
     r = requests.get(url, params=params, timeout=10)
     data = r.json()

@@ -16,7 +16,9 @@ def import_env_variables():
             if value is None:
                 continue
 
-            existing = db.query(SystemConfig).filter(SystemConfig.config_key == key).first()
+            existing = (
+                db.query(SystemConfig).filter(SystemConfig.config_key == key).first()
+            )
 
             if existing:
                 logger.info(f"Skipping existing config: {key}")

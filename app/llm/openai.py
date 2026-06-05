@@ -473,10 +473,10 @@ def generate_swot(core_output: dict):
 
         Input:
         {{
-        "property_type": "{core_output['property_details']['property_type']}",
-        "city": "{core_output['property_details']['city']}",
-        "confidence_score": {core_output['predicted_value']['confidence_score']},
-        "risk_level": "{core_output['bank_lending_model']['risk_level']}"
+        "property_type": "{core_output["property_details"]["property_type"]}",
+        "city": "{core_output["property_details"]["city"]}",
+        "confidence_score": {core_output["predicted_value"]["confidence_score"]},
+        "risk_level": "{core_output["bank_lending_model"]["risk_level"]}"
         }}
 
         Return exactly this JSON:

@@ -5,7 +5,11 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.admin import ValuationAiResponseBlob, ValuationJsonBlob, ValuationReportContextBlob
+from app.schemas.admin import (
+    ValuationAiResponseBlob,
+    ValuationJsonBlob,
+    ValuationReportContextBlob,
+)
 
 
 class ValuationResponse(BaseModel):
@@ -20,8 +24,12 @@ class ValuationResponse(BaseModel):
         description="Valuation category, currently derived from the submitted property type.",
     )
     country_code: str = Field(..., description="Detected property country code.")
-    subscription_id: UUID = Field(..., description="Subscription used to generate the valuation.")
-    created_at: datetime = Field(..., description="UTC timestamp when the valuation report was created.")
+    subscription_id: UUID = Field(
+        ..., description="Subscription used to generate the valuation."
+    )
+    created_at: datetime = Field(
+        ..., description="UTC timestamp when the valuation report was created."
+    )
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -86,7 +94,9 @@ class ValuationDetailResponse(ValuationResponse):
                 "report_context": {
                     "currency_code": "AED",
                     "future_outlook": [],
-                    "property_maps": {"static_map_url": "https://maps.example/static-map"},
+                    "property_maps": {
+                        "static_map_url": "https://maps.example/static-map"
+                    },
                 },
             }
         },

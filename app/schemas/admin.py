@@ -209,7 +209,9 @@ class DashboardSubscriptionCountStats(BaseModel):
 
 
 class DashboardSubscriptionRevenueStats(BaseModel):
-    total: int = Field(..., description="Total revenue from all subscriptions for the plan.")
+    total: int = Field(
+        ..., description="Total revenue from all subscriptions for the plan."
+    )
     active: int = Field(..., description="Revenue from active subscriptions only.")
 
 
@@ -248,7 +250,9 @@ class DashboardValuationCategoryPoint(BaseModel):
 
 class DashboardValuationsResponse(BaseModel):
     by_category: List[DashboardValuationCategoryPoint]
-    last_30_days: int = Field(..., description="Valuations created in the last 30 days.")
+    last_30_days: int = Field(
+        ..., description="Valuations created in the last 30 days."
+    )
 
     model_config = ConfigDict(
         json_schema_extra={

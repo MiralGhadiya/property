@@ -17,9 +17,14 @@ class Feedback(UUIDPrimaryKeyMixin, Base):
         Index("ix_feedback_status_created_at", "status", "created_at"),
     )
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
 
-    type = Column(Enum("GENERAL", "VALUATION", "PAYMENT", "SUBSCRIPTION", name="feedback_type"), nullable=False)
+    type = Column(
+        Enum("GENERAL", "VALUATION", "PAYMENT", "SUBSCRIPTION", name="feedback_type"),
+        nullable=False,
+    )
 
     subject = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)

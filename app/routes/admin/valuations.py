@@ -206,7 +206,11 @@ def list_valuations(
 
     # 📄 PAGINATION
     if params["limit"] is not None:
-        valuations = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"]).all()
+        valuations = (
+            query.offset((params["page"] - 1) * params["limit"])
+            .limit(params["limit"])
+            .all()
+        )
     else:
         valuations = query.all()
 
@@ -275,7 +279,9 @@ def get_valuation_details(
         logger.warning(f"Valuation not found valuation_id={valuation_id}")
         raise HTTPException(404, "Valuation not found")
 
-    return success_response(data=valuation, message="Valuation details fetched successfully")
+    return success_response(
+        data=valuation, message="Valuation details fetched successfully"
+    )
 
 
 @router.get(
@@ -311,7 +317,7 @@ def get_user_valuations(
     params: dict = Depends(pagination_params),
 ):
 
-    logger.info(f"Admin fetching valuations user_id={user_id} " f"page={params['page']}")
+    logger.info(f"Admin fetching valuations user_id={user_id} page={params['page']}")
 
     user = db.get(User, user_id)
     if not user:
@@ -329,7 +335,9 @@ def get_user_valuations(
     ).filter(ValuationReport.user_id == user_id)
 
     if params["search"]:
-        query = query.filter(ValuationReport.valuation_id.ilike(f"%{params['search']}%"))
+        query = query.filter(
+            ValuationReport.valuation_id.ilike(f"%{params['search']}%")
+        )
 
     total = query.order_by(None).count()
 
@@ -393,7 +401,11 @@ def delete_valuation(
 ):
     logger.info(f"Admin deleting valuation valuation_id={valuation_id}")
 
-    valuation = db.query(ValuationReport).filter(ValuationReport.valuation_id == valuation_id).first()
+    valuation = (
+        db.query(ValuationReport)
+        .filter(ValuationReport.valuation_id == valuation_id)
+        .first()
+    )
 
     if not valuation:
         logger.warning(f"Valuation not found during delete valuation_id={valuation_id}")

@@ -48,19 +48,23 @@ def get_next_valuation_sequence(db) -> int:
     """
     db.execute(text("SELECT pg_advisory_xact_lock(:lock_key)"), {"lock_key": 482001})
 
-    sequence_exists = db.execute(text("SELECT to_regclass('public.valuation_seq')")).scalar()
+    sequence_exists = db.execute(
+        text("SELECT to_regclass('public.valuation_seq')")
+    ).scalar()
 
     if sequence_exists is None:
         db.execute(text("CREATE SEQUENCE valuation_seq START WITH 1 INCREMENT BY 1"))
 
-        max_existing_suffix = db.execute(text("""
+        max_existing_suffix = db.execute(
+            text("""
                 SELECT COALESCE(
                     MAX(CAST(split_part(valuation_id, '-', 3) AS BIGINT)),
                     0
                 )
                 FROM valuation_reports
                 WHERE valuation_id ~ '^DV-[0-9]{8}-[0-9]+$'
-                """)).scalar()
+                """)
+        ).scalar()
 
         if max_existing_suffix:
             db.execute(
@@ -92,7 +96,11 @@ def process_valuation_job(self, job_id: str):
 
         # ai_json = generate_valuation_report(user_input)
 
-        subscription = db.query(UserSubscription).filter(UserSubscription.id == job.subscription_id).first()
+        subscription = (
+            db.query(UserSubscription)
+            .filter(UserSubscription.id == job.subscription_id)
+            .first()
+        )
 
         plan_name = subscription.plan.name.upper()
 
@@ -138,7 +146,12 @@ def process_valuation_job(self, job_id: str):
 
             except Exception as e:
                 logger.warning(f"SWOT generation failed: {e}")
-                core["swot_analysis"] = {"strengths": [], "weaknesses": [], "opportunities": [], "threats": []}
+                core["swot_analysis"] = {
+                    "strengths": [],
+                    "weaknesses": [],
+                    "opportunities": [],
+                    "threats": [],
+                }
 
         ai_json = core
         ai_json["valuation_validity_days"] = 60
@@ -151,7 +164,11 @@ def process_valuation_job(self, job_id: str):
         valuation_id = f"DV-{today}-{seq:04d}"
 
         logger.debug("AI JSON response generated for job_id=%s", job_id)
-        logger.debug("Forecast generated for job_id=%s forecast=%s", job_id, ai_json.get("forecast"))
+        logger.debug(
+            "Forecast generated for job_id=%s forecast=%s",
+            job_id,
+            ai_json.get("forecast"),
+        )
 
         context = build_report_context(ai_json, user_input, valuation_id=valuation_id)
 
@@ -194,7 +211,9 @@ def process_valuation_job(self, job_id: str):
         currency_code = "USD"
 
         if geo:
-            context["property_maps"] = build_static_maps(geo["lat"], geo["lng"], address)
+            context["property_maps"] = build_static_maps(
+                geo["lat"], geo["lng"], address
+            )
 
             detected_country = geo.get("country_code")
 

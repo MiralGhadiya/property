@@ -27,7 +27,11 @@ def build_accesses(staff: Staff) -> dict:
 
 
 @router.post("/", response_model=APIResponse[StaffResponse])
-def create_staff(staff: StaffCreate, db: Session = Depends(get_db), admin_user: User = Depends(require_management)):
+def create_staff(
+    staff: StaffCreate,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(require_management),
+):
 
     existing_staff = db.query(Staff).filter(Staff.email == staff.email).first()
     if existing_staff:
@@ -80,7 +84,11 @@ def list_staff(
     query = db.query(Staff)
 
     if params["limit"] is not None:
-        staff_members = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"]).all()
+        staff_members = (
+            query.offset((params["page"] - 1) * params["limit"])
+            .limit(params["limit"])
+            .all()
+        )
     else:
         staff_members = query.all()
 
@@ -167,7 +175,9 @@ def update_staff(
     if staff_update.can_access_reports is not None:
         staff_member.can_access_reports = staff_update.can_access_reports
     if staff_update.can_access_subscriptions_plans is not None:
-        staff_member.can_access_subscriptions_plans = staff_update.can_access_subscriptions_plans
+        staff_member.can_access_subscriptions_plans = (
+            staff_update.can_access_subscriptions_plans
+        )
     if staff_update.can_access_config is not None:
         staff_member.can_access_config = staff_update.can_access_config
 
@@ -201,4 +211,6 @@ def delete_staff(
     db.delete(staff_member)
     db.commit()
 
-    return success_response(message="Staff member deleted successfully", data={"id": str(staff_id)})
+    return success_response(
+        message="Staff member deleted successfully", data={"id": str(staff_id)}
+    )

@@ -78,7 +78,9 @@ def list_inquiries(
 
     # apply pagination only when a limit is provided; otherwise return all results
     if params["limit"] is not None:
-        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(
+            params["limit"]
+        )
     inquiries = query.all()
 
     return success_response(

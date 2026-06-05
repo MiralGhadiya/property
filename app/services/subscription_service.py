@@ -85,7 +85,9 @@ def get_active_subscription(
     user_id: UUID,
     country_code: str,
 ):
-    logger.debug(f"Fetching active subscription user_id={user_id} country={country_code}")
+    logger.debug(
+        f"Fetching active subscription user_id={user_id} country={country_code}"
+    )
 
     local_sub = _base_usable_subscription_query(
         db=db,
@@ -119,7 +121,9 @@ def enforce_subscription(
     user_id: UUID,
     subscription_id: UUID,
 ):
-    logger.info(f"Enforcing subscription user_id={user_id} " f"subscription_id={subscription_id}")
+    logger.info(
+        f"Enforcing subscription user_id={user_id} subscription_id={subscription_id}"
+    )
 
     sub = (
         db.query(UserSubscription)
@@ -161,7 +165,9 @@ def enforce_subscription(
         raise HTTPException(403, "Subscription is missing validity dates")
 
     if start_date > now or end_date < now:
-        logger.warning(f"Subscription time invalid | " f"start={start_date} end={end_date} now={now}")
+        logger.warning(
+            f"Subscription time invalid | start={start_date} end={end_date} now={now}"
+        )
         raise HTTPException(403, "Subscription is not valid at this time")
 
     plan = sub.plan
@@ -265,11 +271,15 @@ def send_expiry_reminders(db: Session):
 
     for sub in subscriptions:
         if not sub.end_date:
-            logger.warning(f"[EXPIRY REMINDER] Subscription id={sub.id} has no end_date")
+            logger.warning(
+                f"[EXPIRY REMINDER] Subscription id={sub.id} has no end_date"
+            )
             continue
 
         if not sub.plan:
-            logger.warning(f"[EXPIRY REMINDER] Subscription id={sub.id} has no plan relation")
+            logger.warning(
+                f"[EXPIRY REMINDER] Subscription id={sub.id} has no plan relation"
+            )
             continue
 
         days_left = (to_utc_aware(sub.end_date).date() - today).days
@@ -306,7 +316,10 @@ def send_expiry_reminders(db: Session):
             sent += 1
 
         except Exception:
-            logger.exception(f"[EXPIRY REMINDER] FAILED sending email | " f"user_id={user.id} sub_id={sub.id}")
+            logger.exception(
+                f"[EXPIRY REMINDER] FAILED sending email | "
+                f"user_id={user.id} sub_id={sub.id}"
+            )
 
     logger.info(f"[EXPIRY REMINDER] Job finished | emails_sent={sent}")
 
@@ -415,7 +428,9 @@ def _create_subscription_plan(
     db.add(plan)
     existing_plans[(country_code, plan_name)] = plan
     created_plans.append(
-        "GLOBAL" if country_code == GLOBAL_COUNTRY_CODE and plan_name == "GLOBAL" else f"{plan_name}-{country_code}"
+        "GLOBAL"
+        if country_code == GLOBAL_COUNTRY_CODE and plan_name == "GLOBAL"
+        else f"{plan_name}-{country_code}"
     )
 
 
@@ -449,7 +464,9 @@ def add_subscription_plans_from_excel(
         df = df[df["country_code"] != ""].copy()
 
         if df.empty:
-            raise HTTPException(400, "Excel file does not contain any valid country codes")
+            raise HTTPException(
+                400, "Excel file does not contain any valid country codes"
+            )
 
         created_plans = []
         global_reference_pro_price = None
@@ -462,7 +479,11 @@ def add_subscription_plans_from_excel(
         country_codes.add(GLOBAL_COUNTRY_CODE)
 
         existing_plans = {}
-        for plan in db.query(SubscriptionPlan).filter(SubscriptionPlan.country_code.in_(country_codes)).all():
+        for plan in (
+            db.query(SubscriptionPlan)
+            .filter(SubscriptionPlan.country_code.in_(country_codes))
+            .all()
+        ):
             existing_plans.setdefault(
                 (plan.country_code.upper(), plan.name.upper()),
                 plan,
@@ -547,7 +568,9 @@ def add_subscription_plans_from_excel(
             else:
                 master_reports = 10
                 master_payload = {
-                    "price": int(round(int(pro_payload["price"]) * master_reports * 0.8)),
+                    "price": int(
+                        round(int(pro_payload["price"]) * master_reports * 0.8)
+                    ),
                     "currency": str(pro_payload["currency"]),
                     "max_reports": master_reports,
                 }
@@ -624,7 +647,9 @@ def get_usable_subscription(
     user_id: UUID,
     country_code: str,
 ):
-    logger.debug(f"Fetching usable subscription user_id={user_id} country={country_code}")
+    logger.debug(
+        f"Fetching usable subscription user_id={user_id} country={country_code}"
+    )
 
     subs = _base_usable_subscription_query(
         db=db,

@@ -31,10 +31,10 @@ def generate_valuation_summary(form_data: dict):
 
         {{
           "property_details": {{
-              "address": "{form_data.get('full_address')}",
-              "city": "{form_data.get('city_location')}",
-              "country": "{form_data.get('country')}",
-              "property_type": "{form_data.get('property_type')}",
+              "address": "{form_data.get("full_address")}",
+              "city": "{form_data.get("city_location")}",
+              "country": "{form_data.get("country")}",
+              "property_type": "{form_data.get("property_type")}",
               "land_area_sqft": {int(form_data.get("land_area").split()[0])},
               "built_up_area_sqft": {int(form_data.get("built_up_area").split()[0])},
               "age_years": {int(form_data.get("year_built"))}

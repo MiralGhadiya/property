@@ -11,7 +11,9 @@ def import_countries(csv_path: str):
 
     try:
         existing_country_codes = {
-            country_code for (country_code,) in db.query(Country.country_code).all() if country_code
+            country_code
+            for (country_code,) in db.query(Country.country_code).all()
+            if country_code
         }
 
         with open(csv_path, newline="", encoding="utf-8") as csvfile:

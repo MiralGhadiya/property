@@ -16,7 +16,9 @@ def resolve_pricing_country(request, current_user) -> str:
         return request.state.ip_country
 
     if current_user and current_user.country:
-        logger.debug(f"[Pricing] Using user profile country: {current_user.country.country_code}")
+        logger.debug(
+            f"[Pricing] Using user profile country: {current_user.country.country_code}"
+        )
         return current_user.country.country_code
 
     logger.debug("[Pricing] Falling back to DEFAULT country")
@@ -24,8 +26,14 @@ def resolve_pricing_country(request, current_user) -> str:
 
 
 def resolve_currency_code(request, current_user) -> str:
-    if current_user and current_user.country and getattr(current_user.country, "currency_code", None):
-        logger.debug(f"[Pricing] Using user currency: {current_user.country.currency_code}")
+    if (
+        current_user
+        and current_user.country
+        and getattr(current_user.country, "currency_code", None)
+    ):
+        logger.debug(
+            f"[Pricing] Using user currency: {current_user.country.currency_code}"
+        )
         return current_user.country.currency_code
 
     logger.debug("[Pricing] Falling back to USD currency")
@@ -33,7 +41,10 @@ def resolve_currency_code(request, current_user) -> str:
 
 
 def get_plans_with_pricing(
-    db: Session, country: str, current_user: Optional[User] = None, force_currency_by_country: bool = False
+    db: Session,
+    country: str,
+    current_user: Optional[User] = None,
+    force_currency_by_country: bool = False,
 ):
     logger.info(
         f"[Pricing] Fetching plans for country={country}, force_currency_by_country={force_currency_by_country}"
@@ -109,12 +120,16 @@ def get_plans_with_pricing(
     else:
         profile_currency = (
             current_user.country.currency_code
-            if current_user and current_user.country and current_user.country.currency_code
+            if current_user
+            and current_user.country
+            and current_user.country.currency_code
             else None
         )
         logger.debug(f"[Pricing] Profile currency: {profile_currency}")
 
-    user_currency, rate = resolve_currency(db=db, country_code=country, profile_currency=profile_currency)
+    user_currency, rate = resolve_currency(
+        db=db, country_code=country, profile_currency=profile_currency
+    )
 
     logger.debug(f"[Pricing] Resolved currency={user_currency}, rate={rate}")
 
@@ -122,10 +137,13 @@ def get_plans_with_pricing(
 
     # 5️⃣ Convert BASIC / PRO / MASTER
     for plan in usd_plans:
-        converted_price = round(plan.price * rate, 2) if rate is not None else plan.price
+        converted_price = (
+            round(plan.price * rate, 2) if rate is not None else plan.price
+        )
 
         logger.debug(
-            f"[Pricing] Plan={plan.name}, base_price={plan.price}, " f"converted_price={converted_price}, rate={rate}"
+            f"[Pricing] Plan={plan.name}, base_price={plan.price}, "
+            f"converted_price={converted_price}, rate={rate}"
         )
 
         response.append(
@@ -141,7 +159,9 @@ def get_plans_with_pricing(
 
     # 6️⃣ Add GLOBAL as-is (NO conversion)
     if global_plan:
-        logger.debug(f"[Pricing] Adding GLOBAL plan without conversion: {global_plan.name}")
+        logger.debug(
+            f"[Pricing] Adding GLOBAL plan without conversion: {global_plan.name}"
+        )
 
         response.append(
             {

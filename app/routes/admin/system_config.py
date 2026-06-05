@@ -10,7 +10,11 @@ from app.common import PaginatedResponse
 from app.core.config_manager import notify_config_update
 from app.deps import get_db, pagination_params, require_management
 from app.models.system_config import SystemConfig
-from app.schemas.admin import SystemConfigCreate, SystemConfigResponse, SystemConfigUpdate
+from app.schemas.admin import (
+    SystemConfigCreate,
+    SystemConfigResponse,
+    SystemConfigUpdate,
+)
 from app.utils.logger_config import app_logger as logger
 from app.utils.response import APIResponse, success_response
 
@@ -26,7 +30,11 @@ def create_config(
     db: Session = Depends(get_db),
     admin_user=Depends(require_management),
 ):
-    existing = db.query(SystemConfig).filter(SystemConfig.config_key == payload.config_key).first()
+    existing = (
+        db.query(SystemConfig)
+        .filter(SystemConfig.config_key == payload.config_key)
+        .first()
+    )
 
     if existing:
         raise HTTPException(400, "Config key already exists")
@@ -60,7 +68,9 @@ def list_configs(
 
     query = query.order_by(SystemConfig.config_key.asc())
     if params["limit"] is not None:
-        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(
+            params["limit"]
+        )
 
     configs = query.all()
 

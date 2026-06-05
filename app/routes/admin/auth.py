@@ -59,7 +59,11 @@ def management_login(
 ):
 
     # 1️⃣ Check Admin (superuser)
-    admin = db.query(User).filter(User.email == data.email, User.is_superuser == True).first()
+    admin = (
+        db.query(User)
+        .filter(User.email == data.email, User.is_superuser == True)
+        .first()
+    )
 
     if admin:
         if not verify_password(data.password, admin.hashed_password):
@@ -124,7 +128,6 @@ def management_me(
 ):
 
     if isinstance(current, User):
-
         return success_response(
             data={
                 "type": "admin",
@@ -136,7 +139,6 @@ def management_me(
         )
 
     if isinstance(current, Staff):
-
         return success_response(
             data={
                 "type": "staff",
@@ -199,7 +201,9 @@ def admin_change_password(
         current_admin.hashed_password = hash_password(data.new_password)
         db.commit()
     except Exception as e:
-        logger.error(f"Error changing admin password user_id={current_admin.id} error={str(e)}")
+        logger.error(
+            f"Error changing admin password user_id={current_admin.id} error={str(e)}"
+        )
         raise HTTPException(status_code=500, detail="Error changing password")
 
     logger.info(f"Admin password changed user_id={current_admin.id}")

@@ -48,7 +48,9 @@ def _pricing_country(request: Request, current_user: User) -> str:
 
 def _expire_existing_active_subs(db: Session, user_id: int, now: datetime):
     db.query(UserSubscription).filter(
-        UserSubscription.user_id == user_id, UserSubscription.is_active == True, UserSubscription.is_expired == False
+        UserSubscription.user_id == user_id,
+        UserSubscription.is_active == True,
+        UserSubscription.is_expired == False,
     ).update({"is_active": False, "is_expired": True, "end_date": now})
 
 
@@ -60,7 +62,11 @@ def create_order(
     current_user: User = Depends(get_current_user),
 ):
 
-    plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == plan_id, SubscriptionPlan.is_active == True).first()
+    plan = (
+        db.query(SubscriptionPlan)
+        .filter(SubscriptionPlan.id == plan_id, SubscriptionPlan.is_active == True)
+        .first()
+    )
 
     if not plan:
         raise HTTPException(404, "Plan not found")
@@ -240,7 +246,10 @@ def verify_payment(
             db.refresh(settings)
 
         # If value is NULL or invalid → set default
-        if not settings.subscription_duration_days or settings.subscription_duration_days <= 0:
+        if (
+            not settings.subscription_duration_days
+            or settings.subscription_duration_days <= 0
+        ):
             settings.subscription_duration_days = 365
             db.commit()
             db.refresh(settings)
@@ -250,7 +259,10 @@ def verify_payment(
 
         db.commit()
 
-        return {"message": "Payment successful & subscription activated", "subscription_id": str(sub.id)}
+        return {
+            "message": "Payment successful & subscription activated",
+            "subscription_id": str(sub.id),
+        }
 
     except SignatureVerificationError:
         raise HTTPException(400, "Invalid payment signature")

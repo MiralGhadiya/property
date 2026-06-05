@@ -12,7 +12,11 @@ from app.database.mixins import UUIDPrimaryKeyMixin
 class FeedbackMessage(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "feedback_messages"
 
-    feedback_id = Column(UUID(as_uuid=True), ForeignKey("feedback.id", ondelete="CASCADE"), nullable=False)
+    feedback_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("feedback.id", ondelete="CASCADE"),
+        nullable=False,
+    )
 
     sender = Column(Enum("USER", "ADMIN", name="feedback_sender"), nullable=False)
 

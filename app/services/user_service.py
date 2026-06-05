@@ -22,8 +22,18 @@ def get_user_by_mobile(db: Session, mobile_number: str):
     return db.query(User).filter(User.mobile_number == mobile_number).first()
 
 
-def create_user(db: Session, email: str, username: str, mobile_number: str, password: str, country_id: int, role: str):
-    logger.info(f"Creating user username={username} " f"email={email} mobile={mobile_number}")
+def create_user(
+    db: Session,
+    email: str,
+    username: str,
+    mobile_number: str,
+    password: str,
+    country_id: int,
+    role: str,
+):
+    logger.info(
+        f"Creating user username={username} email={email} mobile={mobile_number}"
+    )
     user = User(
         email=email,
         username=username,

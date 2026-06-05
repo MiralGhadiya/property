@@ -54,7 +54,9 @@ def get_ip_country(ip: str) -> str | None:
 
             return country
 
-        logger.warning(f"IPINFO returned status={res.status_code} ip={ip} body={res.text}")
+        logger.warning(
+            f"IPINFO returned status={res.status_code} ip={ip} body={res.text}"
+        )
 
     except requests.RequestException:
         logger.exception(f"Network error while resolving ip={ip}")

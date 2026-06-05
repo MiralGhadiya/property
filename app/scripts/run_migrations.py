@@ -31,7 +31,9 @@ def get_single_head_revision(script_directory: ScriptDirectory) -> str:
     heads = script_directory.get_heads()
 
     if len(heads) != 1:
-        raise RuntimeError("Expected exactly one Alembic head revision, " f"found {len(heads)}: {heads}")
+        raise RuntimeError(
+            f"Expected exactly one Alembic head revision, found {len(heads)}: {heads}"
+        )
 
     return heads[0]
 
@@ -43,7 +45,13 @@ def get_current_revisions(connection) -> tuple[str, ...]:
     if "alembic_version" not in table_names:
         return ()
 
-    revisions = connection.execute(text("SELECT version_num FROM alembic_version ORDER BY version_num")).scalars().all()
+    revisions = (
+        connection.execute(
+            text("SELECT version_num FROM alembic_version ORDER BY version_num")
+        )
+        .scalars()
+        .all()
+    )
 
     return tuple(revisions)
 
@@ -82,11 +90,13 @@ def format_diffs(diffs: list, limit: int = 5) -> str:
 
 
 def rewrite_alembic_version(connection, head_revision: str) -> None:
-    connection.execute(text("""
+    connection.execute(
+        text("""
             CREATE TABLE IF NOT EXISTS alembic_version (
                 version_num VARCHAR(32) NOT NULL PRIMARY KEY
             )
-            """))
+            """)
+    )
     connection.execute(text("DELETE FROM alembic_version"))
     connection.execute(
         text("INSERT INTO alembic_version (version_num) VALUES (:head_revision)"),
@@ -106,7 +116,9 @@ def reconcile_version_table_if_needed(
             return False
 
         unknown_revisions = tuple(
-            revision for revision in current_revisions if not is_known_revision(script_directory, revision)
+            revision
+            for revision in current_revisions
+            if not is_known_revision(script_directory, revision)
         )
 
         needs_reconciliation = bool(unknown_revisions) or not current_revisions
@@ -125,7 +137,9 @@ def reconcile_version_table_if_needed(
 
         if diffs:
             current_state = (
-                f"unknown revision(s) {unknown_revisions}" if unknown_revisions else "missing alembic_version rows"
+                f"unknown revision(s) {unknown_revisions}"
+                if unknown_revisions
+                else "missing alembic_version rows"
             )
             raise RuntimeError(
                 "Database schema cannot be auto-reconciled because the live "

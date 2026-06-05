@@ -9,7 +9,14 @@ from app.core.config_manager import load_config, start_listener_thread
 from app.middleware.ip_country import get_client_ip
 from app.middleware.ip_country_middleware import IPCountryMiddleware
 from app.routes import auth as user_auth
-from app.routes import inquiry, payment, subscription, unified_payment, user_feedback, valuation
+from app.routes import (
+    inquiry,
+    payment,
+    subscription,
+    unified_payment,
+    user_feedback,
+    valuation,
+)
 from app.routes.admin import (
     auth,
     country,

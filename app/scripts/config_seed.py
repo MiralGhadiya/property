@@ -40,9 +40,13 @@ CONFIG_ENV_KEYS = (
 
 
 def load_config_seed_values() -> dict[str, str]:
-    env_file_values = {key: value for key, value in dotenv_values(".env").items() if value is not None}
+    env_file_values = {
+        key: value for key, value in dotenv_values(".env").items() if value is not None
+    }
 
     if env_file_values:
         return env_file_values
 
-    return {key: value for key in CONFIG_ENV_KEYS if (value := os.getenv(key)) is not None}
+    return {
+        key: value for key in CONFIG_ENV_KEYS if (value := os.getenv(key)) is not None
+    }

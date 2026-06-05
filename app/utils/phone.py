@@ -1,5 +1,9 @@
 import phonenumbers
-from phonenumbers.phonenumberutil import NumberParseException, region_code_for_country_code, region_code_for_number
+from phonenumbers.phonenumberutil import (
+    NumberParseException,
+    region_code_for_country_code,
+    region_code_for_number,
+)
 
 from app.utils.logger_config import app_logger as logger
 

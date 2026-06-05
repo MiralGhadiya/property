@@ -88,7 +88,9 @@ def import_env_variables(db: Session) -> None:
 def import_countries(db: Session, csv_path: Path) -> None:
     try:
         existing_country_codes = {
-            country_code for (country_code,) in db.query(Country.country_code).all() if country_code
+            country_code
+            for (country_code,) in db.query(Country.country_code).all()
+            if country_code
         }
 
         with csv_path.open(newline="", encoding="utf-8") as csvfile:
@@ -142,7 +144,9 @@ def get_country_by_code(db: Session, country_code: str) -> Country:
     country = db.query(Country).filter(Country.country_code == country_code).first()
 
     if not country:
-        raise ValueError(f"Country not found for mobile number country code {country_code}")
+        raise ValueError(
+            f"Country not found for mobile number country code {country_code}"
+        )
 
     return country
 
@@ -190,7 +194,8 @@ def seed_management_users(db: Session) -> None:
 
         if existing_user:
             logger.info(
-                "Skipping existing management user " f"email={user_data['email']} username={user_data['username']}"
+                "Skipping existing management user "
+                f"email={user_data['email']} username={user_data['username']}"
             )
             continue
 
@@ -223,12 +228,17 @@ def seed_management_users(db: Session) -> None:
         )
         db.flush()
 
-        logger.info("Seeded management user " f"email={user_data['email']} role={user_data['role']}")
+        logger.info(
+            "Seeded management user "
+            f"email={user_data['email']} role={user_data['role']}"
+        )
 
 
 def import_subscription_plans(db: Session, excel_path: Path) -> None:
     if not excel_path.exists():
-        raise FileNotFoundError(f"Subscription plans Excel file not found: {excel_path}")
+        raise FileNotFoundError(
+            f"Subscription plans Excel file not found: {excel_path}"
+        )
 
     with excel_path.open("rb") as excel_file:
         created_plans = add_subscription_plans_from_excel(
@@ -237,7 +247,7 @@ def import_subscription_plans(db: Session, excel_path: Path) -> None:
         )
 
     if created_plans:
-        logger.info("Subscription plans import completed " f"created={created_plans}")
+        logger.info(f"Subscription plans import completed created={created_plans}")
     else:
         logger.info("Subscription plans import completed with no new plans created")
 

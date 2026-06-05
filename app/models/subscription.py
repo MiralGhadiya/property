@@ -2,7 +2,16 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -15,7 +24,12 @@ class SubscriptionPlan(UUIDPrimaryKeyMixin, Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "name", "country_code", "price", "currency", "max_reports", name="uq_subscription_plan_unique"
+            "name",
+            "country_code",
+            "price",
+            "currency",
+            "max_reports",
+            name="uq_subscription_plan_unique",
         ),
         Index("ix_subscription_plans_country_active", "country_code", "is_active"),
     )
@@ -57,8 +71,15 @@ class UserSubscription(UUIDPrimaryKeyMixin, Base):
         ),
     )
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("subscription_plans.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
+    plan_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("subscription_plans.id"),
+        nullable=False,
+        index=True,
+    )
 
     pricing_country_code = Column(String, nullable=False)
     ip_country_code = Column(String, nullable=True, index=True)

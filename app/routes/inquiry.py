@@ -27,7 +27,10 @@ def create_inquiry(
         # Optional: Send email to admin
         # send_admin_feedback_email(...)
 
-        return {"message": "Thank you! We’ll get back to you shortly.", "inquiry_id": inquiry.id}
+        return {
+            "message": "Thank you! We’ll get back to you shortly.",
+            "inquiry_id": inquiry.id,
+        }
 
     except Exception:
         db.rollback()

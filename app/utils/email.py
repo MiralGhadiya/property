@@ -239,7 +239,7 @@ def send_subscription_expiry_email(to_email: str, plan_name: str, expiry_date):
         body = f"""
             Hello,
 
-            Your subscription plan "{plan_name}" will expire on {expiry_date.strftime('%Y-%m-%d')}.
+            Your subscription plan "{plan_name}" will expire on {expiry_date.strftime("%Y-%m-%d")}.
 
             Please renew your subscription to continue uninterrupted access.
 
@@ -295,7 +295,9 @@ def send_admin_feedback_email(feedback, user):
         logger.info(f"Admin feedback email sent feedback_id={feedback.id}")
 
     except Exception:
-        logger.exception(f"Failed sending admin feedback email feedback_id={feedback.id}")
+        logger.exception(
+            f"Failed sending admin feedback email feedback_id={feedback.id}"
+        )
 
 
 def send_feedback_reply_email(to_email: str, feedback_id: int, reply: str):
@@ -327,4 +329,6 @@ def send_feedback_reply_email(to_email: str, feedback_id: int, reply: str):
         logger.info(f"Feedback reply email sent feedback_id={feedback_id}")
 
     except Exception:
-        logger.exception(f"Failed sending feedback reply email feedback_id={feedback_id}")
+        logger.exception(
+            f"Failed sending feedback reply email feedback_id={feedback_id}"
+        )

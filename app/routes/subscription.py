@@ -8,7 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.common import PaginatedResponse
-from app.deps import get_current_user, get_current_user_optional, get_db, pagination_params
+from app.deps import (
+    get_current_user,
+    get_current_user_optional,
+    get_db,
+    pagination_params,
+)
 from app.models import User
 from app.models.country import Country
 from app.models.subscription import SubscriptionPlan, UserSubscription
@@ -29,7 +34,11 @@ def list_plans(
 ):
     ip_country = getattr(request.state, "ip_country", None)
 
-    user_country = current_user.country.country_code if current_user and current_user.country else None
+    user_country = (
+        current_user.country.country_code
+        if current_user and current_user.country
+        else None
+    )
 
     country = ip_country or user_country or "DEFAULT"
 
@@ -49,7 +58,9 @@ def get_plans_by_address_get(
 
     country = geo.get("country_code") or "DEFAULT"
 
-    return get_plans_with_pricing(db, country, current_user, force_currency_by_country=True)
+    return get_plans_with_pricing(
+        db, country, current_user, force_currency_by_country=True
+    )
 
 
 @router.get("/my-plans")
@@ -82,7 +93,8 @@ def get_my_active_plans(
                 SubscriptionPlan.is_active == True,
             )
             .filter(
-                (SubscriptionPlan.max_reports == None) | (UserSubscription.reports_used < SubscriptionPlan.max_reports)
+                (SubscriptionPlan.max_reports == None)
+                | (UserSubscription.reports_used < SubscriptionPlan.max_reports)
             )
             .order_by(UserSubscription.end_date.asc())
             .all()
@@ -96,7 +108,11 @@ def get_my_active_plans(
             "subscription_id": subscription.id,
             "plan_name": subscription.plan_name,
             "country": subscription.country_code,
-            "country_name": ("Global" if subscription.country_code == "GLOBAL" else subscription.country_name),
+            "country_name": (
+                "Global"
+                if subscription.country_code == "GLOBAL"
+                else subscription.country_name
+            ),
             "price": subscription.price,
             "currency": subscription.currency,
             "max_reports": subscription.max_reports,
@@ -123,7 +139,8 @@ def subscription_history(
     to_date: Optional[datetime] = Query(None),
 ):
     logger.info(
-        f"Fetching subscription history user_id={current_user.id} " f"page={params['page']} limit={params['limit']}"
+        f"Fetching subscription history user_id={current_user.id} "
+        f"page={params['page']} limit={params['limit']}"
     )
 
     query = (
@@ -160,7 +177,9 @@ def subscription_history(
 
     query = query.order_by(UserSubscription.start_date.desc())
     if params["limit"] is not None:
-        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(
+            params["limit"]
+        )
 
     subs = query.all()
 
@@ -221,7 +240,9 @@ def get_default_subscription(
         )
     except Exception:
         logger.exception("Failed to fetch default subscription")
-        raise HTTPException(status_code=500, detail="Could not retrieve default subscription")
+        raise HTTPException(
+            status_code=500, detail="Could not retrieve default subscription"
+        )
 
     if not sub:
         raise HTTPException(404, "No active subscription")
@@ -229,7 +250,11 @@ def get_default_subscription(
     return {
         "subscription_id": sub.id,
         "plan": sub.plan.name,
-        "remaining": (None if sub.plan.max_reports is None else max(0, sub.plan.max_reports - sub.reports_used)),
+        "remaining": (
+            None
+            if sub.plan.max_reports is None
+            else max(0, sub.plan.max_reports - sub.reports_used)
+        ),
     }
 
 

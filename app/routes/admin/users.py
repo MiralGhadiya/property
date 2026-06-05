@@ -45,11 +45,17 @@ def list_users(
     is_active: Optional[bool] = Query(None),
     verified_from: Optional[datetime] = Query(None),
     verified_to: Optional[datetime] = Query(None),
-    verified_within_days: Optional[int] = Query(None, ge=1, le=365, description="Email verified within last N days"),
+    verified_within_days: Optional[int] = Query(
+        None, ge=1, le=365, description="Email verified within last N days"
+    ),
     sort_by: str = Query("id"),
     order: str = Query("desc"),
 ):
-    logger.info("Admin listing users " f"page={params['page']} limit={params['limit']} " f"search={params['search']}")
+    logger.info(
+        "Admin listing users "
+        f"page={params['page']} limit={params['limit']} "
+        f"search={params['search']}"
+    )
 
     query = db.query(
         User.id,
@@ -122,7 +128,9 @@ def list_users(
         query = query.order_by(sort_column.desc())
 
     if params["limit"] is not None:
-        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(
+            params["limit"]
+        )
 
     users = query.all()
 
@@ -211,7 +219,9 @@ def create_user(
             raise HTTPException(400, "Email already in use")
 
     # Check existing mobile
-    existing_mobile = db.query(User).filter(User.mobile_number == data.mobile_number).first()
+    existing_mobile = (
+        db.query(User).filter(User.mobile_number == data.mobile_number).first()
+    )
 
     if existing_mobile:
         raise HTTPException(400, "Mobile number already in use")
@@ -272,7 +282,9 @@ def update_user(
         user.username = data.username
 
     if data.email and data.email != user.email:
-        existing_email = db.query(User).filter(User.email == data.email, User.id != user.id).first()
+        existing_email = (
+            db.query(User).filter(User.email == data.email, User.id != user.id).first()
+        )
 
         if existing_email:
             raise HTTPException(400, "Email already in use")
@@ -284,7 +296,8 @@ def update_user(
 
         # Invalidate old verification tokens
         db.query(EmailVerificationToken).filter(
-            EmailVerificationToken.user_id == user.id, EmailVerificationToken.used == False
+            EmailVerificationToken.user_id == user.id,
+            EmailVerificationToken.used == False,
         ).update({"used": True})
 
         # Create new verification token
@@ -298,12 +311,20 @@ def update_user(
 
         # Send verification email
         try:
-            send_verification_email(user.email, f"{get_base_url()}/verify-email?token={raw_token}")
+            send_verification_email(
+                user.email, f"{get_base_url()}/verify-email?token={raw_token}"
+            )
         except Exception:
-            logger.exception(f"Failed to send verification email after admin update user_id={user.id}")
+            logger.exception(
+                f"Failed to send verification email after admin update user_id={user.id}"
+            )
 
     if data.mobile_number and data.mobile_number != user.mobile_number:
-        existing_mobile = db.query(User).filter(User.mobile_number == data.mobile_number, User.id != user.id).first()
+        existing_mobile = (
+            db.query(User)
+            .filter(User.mobile_number == data.mobile_number, User.id != user.id)
+            .first()
+        )
 
         if existing_mobile:
             raise HTTPException(400, "Mobile number already in use")
@@ -366,7 +387,10 @@ def toggle_user_active(
     else:
         logger.info(f"User activated user_id={user.id}")
 
-    return success_response(data={"is_active": user.is_active}, message="User active state updated successfully")
+    return success_response(
+        data={"is_active": user.is_active},
+        message="User active state updated successfully",
+    )
 
 
 @router.post("/{user_id}/logout")

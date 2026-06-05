@@ -12,13 +12,19 @@ from sqlalchemy.orm import Session
 from app.common import PaginatedResponse
 from app.deps import get_db, pagination_params, require_management
 from app.models.subscription import SubscriptionPlan
-from app.schemas import SubscriptionPlanCreate, SubscriptionPlanResponse, SubscriptionPlanUpdate
+from app.schemas import (
+    SubscriptionPlanCreate,
+    SubscriptionPlanResponse,
+    SubscriptionPlanUpdate,
+)
 from app.services.subscription_service import add_subscription_plans_from_excel
 from app.utils.date_filters import filter_by_date_range
 from app.utils.logger_config import app_logger as logger
 from app.utils.response import APIResponse, success_response
 
-router = APIRouter(prefix="/admin/subscription-plans", tags=["admin-subscription-plans"])
+router = APIRouter(
+    prefix="/admin/subscription-plans", tags=["admin-subscription-plans"]
+)
 
 SUBSCRIPTION_PLAN_NOT_FOUND = "Subscription plan not found"
 
@@ -68,7 +74,9 @@ def list_subscription_plans(
         query = query.filter(SubscriptionPlan.name.ilike(f"%{params['search']}%"))
 
     if filters.country_code:
-        query = query.filter(SubscriptionPlan.country_code == filters.country_code.upper())
+        query = query.filter(
+            SubscriptionPlan.country_code == filters.country_code.upper()
+        )
 
     if filters.is_active is not None:
         query = query.filter(SubscriptionPlan.is_active == filters.is_active)
@@ -89,7 +97,9 @@ def list_subscription_plans(
         query = query.filter(SubscriptionPlan.max_reports <= filters.max_reports)
 
     if filters.category:
-        query = query.filter(SubscriptionPlan.allowed_categories.contains([filters.category]))
+        query = query.filter(
+            SubscriptionPlan.allowed_categories.contains([filters.category])
+        )
 
     query = filter_by_date_range(
         query,
@@ -107,7 +117,9 @@ def list_subscription_plans(
     )
 
     if params["limit"] is not None:
-        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(
+            params["limit"]
+        )
 
     plans = query.all()
 
@@ -149,7 +161,9 @@ def create_subscription_plan(
     db: Session = Depends(get_db),
     _: None = Depends(require_management),
 ):
-    logger.info("Admin creating subscription plan " f"name={data.name} country={data.country_code}")
+    logger.info(
+        f"Admin creating subscription plan name={data.name} country={data.country_code}"
+    )
 
     plan = SubscriptionPlan(
         name=data.name.upper(),
@@ -184,7 +198,9 @@ def upload_subscription_plans_excel(
 
     created_plans = add_subscription_plans_from_excel(db=db, file=file.file)
 
-    return success_response(data={"created_plans": created_plans}, message="Plans uploaded successfully")
+    return success_response(
+        data={"created_plans": created_plans}, message="Plans uploaded successfully"
+    )
 
 
 @router.put("/{plan_id}", response_model=APIResponse[SubscriptionPlanResponse])
@@ -215,7 +231,9 @@ def update_subscription_plan(
         logger.exception("Failed to update subscription plan")
         raise HTTPException(500, "Update failed")
 
-    logger.info(f"Subscription plan updated plan_id={plan.id} " f"fields={list(updates.keys())}")
+    logger.info(
+        f"Subscription plan updated plan_id={plan.id} fields={list(updates.keys())}"
+    )
 
     return success_response(data=plan, message="Subscription plan updated")
 
@@ -242,9 +260,13 @@ def toggle_subscription_plan(
         logger.exception("Failed to toggle subscription plan")
         raise HTTPException(500, "Update failed")
 
-    logger.info(f"Subscription plan status changed plan_id={plan.id} " f"is_active={plan.is_active}")
+    logger.info(
+        f"Subscription plan status changed plan_id={plan.id} is_active={plan.is_active}"
+    )
 
-    return success_response(data={"is_active": plan.is_active}, message="Plan status updated")
+    return success_response(
+        data={"is_active": plan.is_active}, message="Plan status updated"
+    )
 
 
 @router.delete("/{plan_id}", response_model=APIResponse[dict])
@@ -282,4 +304,6 @@ def delete_subscription_plan(
 
     logger.info(f"Subscription plan deleted plan_id={plan_id}")
 
-    return success_response(data={"deleted": True}, message="Subscription plan deleted successfully")
+    return success_response(
+        data={"deleted": True}, message="Subscription plan deleted successfully"
+    )

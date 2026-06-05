@@ -6,7 +6,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 ROUTES = ROOT / "app" / "routes"
 OUT = ROOT / "Desktop_Valuation_API.postman_collection.json"
-PAGINATION = [("page", "1", 0), ("limit", "50", 0), ("search", "", 1), ("is_active", "true", 1)]
+PAGINATION = [
+    ("page", "1", 0),
+    ("limit", "50", 0),
+    ("search", "", 1),
+    ("is_active", "true", 1),
+]
 FOLDERS = {
     "app/routes/auth.py": "User Auth",
     "app/routes/valuation.py": "Valuation",
@@ -70,7 +75,10 @@ BODY = {
         "mobile_number": "+971500000002",
         "role": "INDIVIDUAL",
     },
-    "AdminResetPassword": {"new_password": "AdminReset123!", "confirm_password": "AdminReset123!"},
+    "AdminResetPassword": {
+        "new_password": "AdminReset123!",
+        "confirm_password": "AdminReset123!",
+    },
     "AdminFeedbackAction": {
         "status": "IN_PROGRESS",
         "reply": "We are reviewing your feedback.",
@@ -126,17 +134,39 @@ BODY = {
         "can_access_subscriptions_plans": True,
         "can_access_config": True,
     },
-    "SubscriptionPlanCreate": {"name": "PRO", "country_code": "AE", "price": 999, "currency": "AED", "max_reports": 25},
-    "SubscriptionPlanUpdate": {"name": "PRO PLUS", "price": 1299, "currency": "AED", "max_reports": 40},
-    "AssignSubscription": {"plan_id": "{{plan_id}}", "duration_days": 30, "pricing_country_code": "AE"},
-    "UpdateSubscription": {"extend_days": 30, "reset_reports_used": False, "deactivate": False},
+    "SubscriptionPlanCreate": {
+        "name": "PRO",
+        "country_code": "AE",
+        "price": 999,
+        "currency": "AED",
+        "max_reports": 25,
+    },
+    "SubscriptionPlanUpdate": {
+        "name": "PRO PLUS",
+        "price": 1299,
+        "currency": "AED",
+        "max_reports": 40,
+    },
+    "AssignSubscription": {
+        "plan_id": "{{plan_id}}",
+        "duration_days": 30,
+        "pricing_country_code": "AE",
+    },
+    "UpdateSubscription": {
+        "extend_days": 30,
+        "reset_reports_used": False,
+        "deactivate": False,
+    },
     "UpdateSubscriptionDuration": {"duration_days": 365},
     "SystemConfigCreate": {
         "config_key": "SUPPORT_EMAIL",
         "config_value": "support@example.com",
         "description": "Primary support inbox.",
     },
-    "SystemConfigUpdate": {"config_value": "helpdesk@example.com", "description": "Updated support inbox."},
+    "SystemConfigUpdate": {
+        "config_value": "helpdesk@example.com",
+        "description": "Updated support inbox.",
+    },
     "dict": {
         "razorpay_order_id": "{{razorpay_order_id}}",
         "razorpay_payment_id": "{{razorpay_payment_id}}",
@@ -219,7 +249,10 @@ def title(s):
 
 
 def auth(tok):
-    return {"type": "bearer", "bearer": [{"key": "token", "value": "{{%s}}" % tok, "type": "string"}]}
+    return {
+        "type": "bearer",
+        "bearer": [{"key": "token", "value": "{{%s}}" % tok, "type": "string"}],
+    }
 
 
 def url(path, query=None):
@@ -229,7 +262,11 @@ def url(path, query=None):
         live = [i for i in query if not i.get("disabled")]
         if live:
             raw += "?" + "&".join(f"{i['key']}={i['value']}" for i in live)
-    u = {"raw": raw, "host": ["{{base_url}}"], "path": [p for p in path.strip("/").split("/") if p]}
+    u = {
+        "raw": raw,
+        "host": ["{{base_url}}"],
+        "path": [p for p in path.strip("/").split("/") if p],
+    }
     if query:
         u["query"] = query
     return u
@@ -247,12 +284,28 @@ def parse_filters(tree):
     out = {}
     for n in tree.body:
         if isinstance(n, ast.ClassDef):
-            init = next((c for c in n.body if isinstance(c, ast.FunctionDef) and c.name == "__init__"), None)
+            init = next(
+                (
+                    c
+                    for c in n.body
+                    if isinstance(c, ast.FunctionDef) and c.name == "__init__"
+                ),
+                None,
+            )
             if not init:
                 continue
-            args, defs, off = init.args.args[1:], init.args.defaults, len(init.args.args[1:]) - len(init.args.defaults)
+            args, defs, off = (
+                init.args.args[1:],
+                init.args.defaults,
+                len(init.args.args[1:]) - len(init.args.defaults),
+            )
             out[n.name] = [
-                (a.arg, norm(t(a.annotation)), i >= off and "Query(" in t(defs[i - off])) for i, a in enumerate(args)
+                (
+                    a.arg,
+                    norm(t(a.annotation)),
+                    i >= off and "Query(" in t(defs[i - off]),
+                )
+                for i, a in enumerate(args)
             ]
     return out
 
@@ -303,12 +356,18 @@ def endpoints():
     for fp in sorted(ROUTES.rglob("*.py")):
         if fp.name == "__init__.py":
             continue
-        rel, tree, prefix = fp.relative_to(ROOT).as_posix(), ast.parse(fp.read_text(encoding="utf-8")), ""
+        rel, tree, prefix = (
+            fp.relative_to(ROOT).as_posix(),
+            ast.parse(fp.read_text(encoding="utf-8")),
+            "",
+        )
         filters = parse_filters(tree)
         for n in tree.body:
             if (
                 isinstance(n, ast.Assign)
-                and any(isinstance(tg, ast.Name) and tg.id == "router" for tg in n.targets)
+                and any(
+                    isinstance(tg, ast.Name) and tg.id == "router" for tg in n.targets
+                )
                 and isinstance(n.value, ast.Call)
                 and t(n.value.func) == "APIRouter"
             ):
@@ -326,8 +385,16 @@ def endpoints():
                     or dec.func.attr not in {"get", "post", "put", "patch", "delete"}
                 ):
                     continue
-                path = prefix + (dec.args[0].value if dec.args and isinstance(dec.args[0], ast.Constant) else "")
-                args, defs, off = fn.args.args, fn.args.defaults, len(fn.args.args) - len(fn.args.defaults)
+                path = prefix + (
+                    dec.args[0].value
+                    if dec.args and isinstance(dec.args[0], ast.Constant)
+                    else ""
+                )
+                args, defs, off = (
+                    fn.args.args,
+                    fn.args.defaults,
+                    len(fn.args.args) - len(fn.args.defaults),
+                )
                 e = {
                     "folder": folder(rel),
                     "file": rel,
@@ -342,11 +409,19 @@ def endpoints():
                 }
                 pnames = set(re.findall(r"{([^}]+)}", path))
                 for i, a in enumerate(args):
-                    d, ann, raw = defs[i - off] if i >= off else None, norm(t(a.annotation)), t(a.annotation)
+                    d, ann, raw = (
+                        defs[i - off] if i >= off else None,
+                        norm(t(a.annotation)),
+                        t(a.annotation),
+                    )
                     dr = t(d)
                     if "require_management" in dr:
                         e["auth"] = "admin"
-                    elif "get_current_user" in dr and "optional" not in dr and e["auth"] != "admin":
+                    elif (
+                        "get_current_user" in dr
+                        and "optional" not in dr
+                        and e["auth"] != "admin"
+                    ):
                         e["auth"] = "user"
                     if (
                         a.arg
@@ -368,7 +443,10 @@ def endpoints():
                         e["q"] += [qitem(*x[:2], bool(x[2])) for x in PAGINATION]
                         continue
                     if dr.startswith("Depends(") and ann in filters:
-                        e["q"] += [qitem(nm, query_val(nm, tp), opt) for nm, tp, opt in filters[ann]]
+                        e["q"] += [
+                            qitem(nm, query_val(nm, tp), opt)
+                            for nm, tp, opt in filters[ann]
+                        ]
                         continue
                     if ann == "UploadFile" or dr.startswith("File("):
                         e["files"].append(a.arg)
@@ -378,12 +456,24 @@ def endpoints():
                         continue
                     if dr.startswith("Form("):
                         e["form"].append(
-                            (a.arg, query_val(a.arg, ann), int("None" in dr or "Optional[" in raw or "| None" in raw))
+                            (
+                                a.arg,
+                                query_val(a.arg, ann),
+                                int(
+                                    "None" in dr
+                                    or "Optional[" in raw
+                                    or "| None" in raw
+                                ),
+                            )
                         )
                         continue
                     if e["method"] == "GET" or dr.startswith("Query("):
                         e["q"].append(
-                            qitem(a.arg, query_val(a.arg, ann), "None" in dr or "Optional[" in raw or "| None" in raw)
+                            qitem(
+                                a.arg,
+                                query_val(a.arg, ann),
+                                "None" in dr or "Optional[" in raw or "| None" in raw,
+                            )
                         )
                         continue
                     if ann in BODY or ann == "dict":
@@ -406,7 +496,12 @@ def build():
             }
         elif e["form"] or e["files"]:
             f = [
-                {"key": k, "value": str(v), "type": "text", **({"disabled": True} if d else {})}
+                {
+                    "key": k,
+                    "value": str(v),
+                    "type": "text",
+                    **({"disabled": True} if d else {}),
+                }
                 for k, v, d in e["form"]
             ]
             for name in e["files"]:
@@ -416,7 +511,9 @@ def build():
                     else (
                         "{{report_pdf_path}}"
                         if name == "pdf"
-                        else "{{excel_file_path}}" if name == "file" else "{{%s_path}}" % name
+                        else "{{excel_file_path}}"
+                        if name == "file"
+                        else "{{%s_path}}" % name
                     )
                 )
                 f.append({"key": name, "type": "file", "src": src})
@@ -424,10 +521,14 @@ def build():
         auth_obj = (
             auth("admin_access_token")
             if e["auth"] == "admin"
-            else auth("user_access_token") if e["auth"] == "user" else None
+            else auth("user_access_token")
+            if e["auth"] == "user"
+            else None
         )
         groups.setdefault(e["folder"], []).append(
-            item(e["name"], e["method"], e["path"], desc, auth_obj, body, e["q"] or None)
+            item(
+                e["name"], e["method"], e["path"], desc, auth_obj, body, e["q"] or None
+            )
         )
     items = [{"name": k, "item": groups[k]} for k in ORDER if k in groups] + [
         {"name": k, "item": groups[k]} for k in sorted(groups) if k not in ORDER

@@ -2,7 +2,10 @@
 
 from app.celery_app import celery_app
 from app.database.db import SessionLocal
-from app.services.subscription_service import expire_subscriptions, send_expiry_reminders
+from app.services.subscription_service import (
+    expire_subscriptions,
+    send_expiry_reminders,
+)
 
 
 @celery_app.task(name="app.tasks.subscription_tasks.expire_subscriptions_task")

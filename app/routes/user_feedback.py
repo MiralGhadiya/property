@@ -12,7 +12,12 @@ from app.deps import get_current_user, get_db, pagination_params
 from app.models import User
 from app.models.feedback import Feedback
 from app.models.feedback_message import FeedbackMessage
-from app.schemas import FeedbackCreate, FeedbackMessageCreate, FeedbackResponse, FeedbackUpdate
+from app.schemas import (
+    FeedbackCreate,
+    FeedbackMessageCreate,
+    FeedbackResponse,
+    FeedbackUpdate,
+)
 from app.utils.email import send_admin_feedback_email
 from app.utils.logger_config import app_logger as logger
 
@@ -25,7 +30,9 @@ def create_feedback(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    logger.info(f"Feedback submission started user_id={current_user.id} " f"type={data.type}")
+    logger.info(
+        f"Feedback submission started user_id={current_user.id} type={data.type}"
+    )
 
     try:
         feedback = Feedback(user_id=current_user.id, **data.model_dump())
@@ -36,7 +43,9 @@ def create_feedback(
 
         send_admin_feedback_email(feedback, current_user)
 
-        logger.info(f"Feedback created feedback_id={feedback.id}" f"user_id={current_user.id}")
+        logger.info(
+            f"Feedback created feedback_id={feedback.id}user_id={current_user.id}"
+        )
 
         return {"message": "Feedback submitted successfully"}
 
@@ -54,7 +63,9 @@ def my_feedback(
     status: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
 ):
-    logger.info(f"Fetching user feedback user_id={current_user.id} " f"page={params['page']}")
+    logger.info(
+        f"Fetching user feedback user_id={current_user.id} page={params['page']}"
+    )
 
     query = db.query(Feedback).filter(Feedback.user_id == current_user.id)
 
@@ -76,7 +87,9 @@ def my_feedback(
 
     query = query.order_by(Feedback.created_at.desc())
     if params["limit"] is not None:
-        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(
+            params["limit"]
+        )
 
     feedbacks = query.all()
 
@@ -96,7 +109,11 @@ def get_my_feedback_by_id(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    feedback = db.query(Feedback).filter(Feedback.id == feedback_id, Feedback.user_id == current_user.id).first()
+    feedback = (
+        db.query(Feedback)
+        .filter(Feedback.id == feedback_id, Feedback.user_id == current_user.id)
+        .first()
+    )
 
     if not feedback:
         raise HTTPException(404, "Feedback not found")
@@ -111,7 +128,11 @@ def update_my_feedback(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    feedback = db.query(Feedback).filter(Feedback.id == feedback_id, Feedback.user_id == current_user.id).first()
+    feedback = (
+        db.query(Feedback)
+        .filter(Feedback.id == feedback_id, Feedback.user_id == current_user.id)
+        .first()
+    )
 
     if not feedback:
         raise HTTPException(404, "Feedback not found")
@@ -136,7 +157,11 @@ def user_reply_feedback(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    feedback = db.query(Feedback).filter(Feedback.id == feedback_id, Feedback.user_id == current_user.id).first()
+    feedback = (
+        db.query(Feedback)
+        .filter(Feedback.id == feedback_id, Feedback.user_id == current_user.id)
+        .first()
+    )
 
     if not feedback:
         raise HTTPException(404, "Feedback not found")

@@ -22,14 +22,21 @@ class ValuationReport(UUIDPrimaryKeyMixin, Base):
     )
 
     valuation_id = Column(String, unique=True, index=True, nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
     user = relationship("User", lazy="selectin")
     category = Column(String, nullable=False, index=True)
     country_code = Column(String, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     user_fields = deferred(Column(JSON, nullable=False), group="valuation_payload")
     ai_response = deferred(Column(JSON, nullable=False), group="valuation_payload")
-    subscription_id = Column(UUID(as_uuid=True), ForeignKey("user_subscriptions.id"), nullable=False, index=True)
+    subscription_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("user_subscriptions.id"),
+        nullable=False,
+        index=True,
+    )
     report_context = deferred(Column(JSON, nullable=False), group="valuation_payload")
 
 
@@ -40,14 +47,18 @@ class ValuationJob(UUIDPrimaryKeyMixin, Base):
         Index("ix_valuation_jobs_status_created_at", "status", "created_at"),
     )
 
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+    )
     subscription_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     category = Column(String, nullable=False)
     country_code = Column(String(5), nullable=False, index=True)
 
     request_payload = Column(JSON, nullable=False)
 
-    status = Column(String, default="queued", index=True)  # queued | processing | completed | failed
+    status = Column(
+        String, default="queued", index=True
+    )  # queued | processing | completed | failed
     valuation_id = Column(String, nullable=True, index=True)
     error_message = Column(String, nullable=True)
 

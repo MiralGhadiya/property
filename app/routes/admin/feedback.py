@@ -31,7 +31,9 @@ def list_feedback(
     valuation_id: Optional[str] = Query(None),
     subscription_id: Optional[UUID] = Query(None),
 ):
-    logger.info("Admin listing feedback " f"page={params['page']} status={status} type={type}")
+    logger.info(
+        f"Admin listing feedback page={params['page']} status={status} type={type}"
+    )
 
     query = db.query(Feedback).options(
         load_only(

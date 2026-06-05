@@ -6,7 +6,11 @@ from app.services.payment.razorpay_impl import RazorpayProvider
 
 
 class PaymentProviderFactory:
-    _providers = {"RAZORPAY": RazorpayProvider, "PAYPAL": PayPalProvider, "PAYONEER": PayoneerProvider}
+    _providers = {
+        "RAZORPAY": RazorpayProvider,
+        "PAYPAL": PayPalProvider,
+        "PAYONEER": PayoneerProvider,
+    }
 
     @classmethod
     def get_provider(cls, name: str):

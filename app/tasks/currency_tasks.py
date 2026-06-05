@@ -14,7 +14,12 @@ from app.utils.logger_config import app_logger as logger
 load_dotenv()
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=60, retry_kwargs={"max_retries": 3})
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=60,
+    retry_kwargs={"max_retries": 3},
+)
 def update_exchange_rates(self):
     # api_key = os.getenv("EXCHANGE_RATE_API_KEY")
     api_key = get_config("EXCHANGE_RATE_API_KEY")
@@ -44,7 +49,11 @@ def update_exchange_rates(self):
 
             currency = pair.replace("USD", "")
 
-            existing = db.query(ExchangeRate).filter(ExchangeRate.currency_code == currency).first()
+            existing = (
+                db.query(ExchangeRate)
+                .filter(ExchangeRate.currency_code == currency)
+                .first()
+            )
 
             if existing:
                 existing.rate_to_usd = rate

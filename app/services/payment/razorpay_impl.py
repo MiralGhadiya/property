@@ -102,7 +102,9 @@ class RazorpayProvider(BasePaymentProvider):
             razorpay_signature = payload.get("razorpay_signature")
 
             if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
-                raise HTTPException(400, "Missing required Razorpay verification parameters")
+                raise HTTPException(
+                    400, "Missing required Razorpay verification parameters"
+                )
 
             client.utility.verify_payment_signature(
                 {
@@ -127,7 +129,9 @@ class RazorpayProvider(BasePaymentProvider):
                 raise HTTPException(404, "Subscription not found")
 
             if str(sub.user_id) != str(user_id):
-                raise HTTPException(403, "This subscription belongs to a different user")
+                raise HTTPException(
+                    403, "This subscription belongs to a different user"
+                )
 
             # Update provider tracking fields as well as legacy fields
             sub.razorpay_payment_id = razorpay_payment_id

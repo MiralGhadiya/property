@@ -5,7 +5,16 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+)
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, undefer_group
 
@@ -13,7 +22,11 @@ from app.common import PaginatedResponse
 from app.database.db import get_db
 from app.deps import get_current_user, pagination_params
 from app.models import User, ValuationReport
-from app.models.valuation import DesktopValuationForm, ValuationJob, desktop_valuation_form_dep
+from app.models.valuation import (
+    DesktopValuationForm,
+    ValuationJob,
+    desktop_valuation_form_dep,
+)
 from app.services.subscription_service import get_usable_subscription_with_fallback
 from app.tasks.valuation_tasks import process_valuation_job, send_report_email_task
 from app.utils.date_filters import filter_by_date_range
@@ -166,7 +179,9 @@ def my_valuations(
 
     query = query.order_by(ValuationReport.created_at.desc())
     if params["limit"] is not None:
-        query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
+        query = query.offset((params["page"] - 1) * params["limit"]).limit(
+            params["limit"]
+        )
 
     records = query.all()
 

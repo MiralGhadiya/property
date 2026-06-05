@@ -17,7 +17,10 @@ def get_or_create_country_for_phone(
     dial_code: str,
     country_code: str,
 ):
-    logger.debug("Resolving country from phone " f"dial_code={dial_code} country_code={country_code}")
+    logger.debug(
+        "Resolving country from phone "
+        f"dial_code={dial_code} country_code={country_code}"
+    )
 
     country = get_country_by_country_code(db, country_code)
     if country:
@@ -32,7 +35,9 @@ def get_or_create_country_for_phone(
 
 
 def create_country(db: Session, name: str, dial_code: str, country_code: str):
-    logger.info(f"Creating country name={name} dial_code={dial_code} country_code={country_code}")
+    logger.info(
+        f"Creating country name={name} dial_code={dial_code} country_code={country_code}"
+    )
 
     country = Country(
         name=name,
