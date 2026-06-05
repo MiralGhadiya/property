@@ -1,13 +1,13 @@
 import os
 import time
-from threading import Thread, Lock
+from threading import Lock, Thread
+
 from sqlalchemy.orm import Session
 
-from app.database.db import SessionLocal
 from app.core.redis_client import redis_client
+from app.database.db import SessionLocal
 from app.models.system_config import SystemConfig
 from app.utils.logger_config import app_logger as logger
-
 
 CONFIG_HASH = "system_config"
 CONFIG_CHANNEL = "config_update_channel"
@@ -37,10 +37,7 @@ def load_config():
     try:
         logger.info("Loading config from DB")
 
-        configs = db.query(
-            SystemConfig.config_key,
-            SystemConfig.config_value
-        ).all()
+        configs = db.query(SystemConfig.config_key, SystemConfig.config_value).all()
 
         pipe = redis_client.pipeline()
 
@@ -108,11 +105,7 @@ def start_config_listener():
 # THREAD STARTER
 # -------------------------
 def start_listener_thread():
-    Thread(
-        target=start_config_listener,
-        daemon=True,
-        name="config-listener"
-    ).start()
+    Thread(target=start_config_listener, daemon=True, name="config-listener").start()
 
 
 # -------------------------

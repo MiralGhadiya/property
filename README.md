@@ -81,19 +81,109 @@ Logging can be tuned with these optional variables:
 - `LOG_RETENTION_DAYS` defaults to `30`
 - `LOG_TO_CONSOLE` and `LOG_TO_FILE` default to `true`
 
-When running with Docker Compose, `app/logs` is stored in the Docker volume
-`property_app_logs_data`, not directly in the project folder. View today's log
+When running with Docker Compose, there are two useful places to check logs:
+
+- Docker service logs: stdout/stderr from each running container
+- Application file logs: daily files written inside `/app/app/logs` in the `api` container
+
+Check live Docker service logs with:
+
+```bash
+docker compose logs -f api
+docker compose logs -f celery_worker
+docker compose logs -f celery_beat
+docker compose logs -f postgres
+docker compose logs -f redis
+```
+
+View the last 100 lines without following:
+
+```bash
+docker compose logs --tail=100 api
+```
+
+The application file log directory is stored in the Docker volume
+`property_app_logs_data`, not directly in the project folder. View today's app log
 with:
 
 ```bash
 docker compose exec api sh -lc 'ls -lh /app/app/logs && tail -n 100 /app/app/logs/app-$(date +%F).log'
 ```
 
-Copy today's log to the project folder with:
+Find the Docker volume location with:
+
+```bash
+docker volume inspect property_app_logs_data
+```
+
+Copy today's app log to the project folder with:
 
 ```powershell
-docker cp property-api-1:/app/app/logs/app-$(Get-Date -Format yyyy-MM-dd).log .
+docker compose cp api:/app/app/logs/app-$(Get-Date -Format yyyy-MM-dd).log .
 ```
+
+### Check Logs for a Particular Day
+
+Use these steps when you need to debug a problem from a specific date.
+
+1. Check that containers are running.
+
+```bash
+docker compose ps
+```
+
+2. List available application log files inside the API container.
+
+```bash
+docker compose exec api sh -lc 'ls -lh /app/app/logs'
+```
+
+3. View the last 200 lines for a particular day.
+
+Example for `2026-06-05`:
+
+```bash
+docker compose exec api sh -lc 'tail -n 200 /app/app/logs/app-2026-06-05.log'
+```
+
+4. View the full application log file for that day.
+
+```bash
+docker compose exec api sh -lc 'cat /app/app/logs/app-2026-06-05.log'
+```
+
+5. Search errors or tracebacks in that day's application log.
+
+```bash
+docker compose exec api sh -lc 'grep -i "error" /app/app/logs/app-2026-06-05.log'
+docker compose exec api sh -lc 'grep -i "traceback" /app/app/logs/app-2026-06-05.log'
+```
+
+6. Check Docker service logs for the same day.
+
+Use the next date as `--until`. For example, to check only `2026-06-05`:
+
+```bash
+docker compose logs --since "2026-06-05T00:00:00" --until "2026-06-06T00:00:00" api
+docker compose logs --since "2026-06-05T00:00:00" --until "2026-06-06T00:00:00" celery_worker
+docker compose logs --since "2026-06-05T00:00:00" --until "2026-06-06T00:00:00" celery_beat
+```
+
+7. Copy a particular day's application log to the project folder.
+
+Linux or macOS:
+
+```bash
+docker compose cp api:/app/app/logs/app-2026-06-05.log .
+```
+
+Windows PowerShell:
+
+```powershell
+docker compose cp api:/app/app/logs/app-2026-06-05.log .
+```
+
+If the file is not found, run the `ls -lh /app/app/logs` command again and confirm the exact date in the file name.
 
 ## Local Development Setup
 
@@ -209,12 +299,20 @@ Check service status with:
 docker compose ps
 ```
 
-Follow logs with:
+Follow Docker service logs with:
 
 ```bash
 docker compose logs -f api
 docker compose logs -f celery_worker
 docker compose logs -f celery_beat
+docker compose logs -f postgres
+docker compose logs -f redis
+```
+
+Check the persisted application file log inside the API container with:
+
+```bash
+docker compose exec api sh -lc 'ls -lh /app/app/logs && tail -n 100 /app/app/logs/app-$(date +%F).log'
 ```
 
 The API container now bootstraps the project automatically during startup. It imports config values, then countries, then subscription settings, then seeds the two management users, and finally imports subscription plans from `subscription_plans.xlsx` without duplicating existing data.

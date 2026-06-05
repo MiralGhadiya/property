@@ -1,8 +1,9 @@
-#app/llm/openai.py
+# app/llm/openai.py
 
 import json
-from openai import OpenAI, OpenAIError
+
 from langsmith import traceable
+from openai import OpenAI, OpenAIError
 
 from app.core.config_manager import get_config
 from app.utils.logger_config import app_logger as logger
@@ -10,6 +11,7 @@ from app.utils.logger_config import app_logger as logger
 
 class LLMError(Exception):
     """Base exception for LLM-related errors."""
+
     pass
 
 
@@ -41,7 +43,7 @@ def get_openai_client():
     _current_api_key = api_key
 
     return _client
-  
+
 
 BASE_PROMPT = """
           Role: Certified real estate valuation engine.
@@ -145,7 +147,6 @@ BASE_PROMPT = """
         """
 
 PROPERTY_PROMPTS = {
-
     "residential plot": """
             Property Rules: Residential Plot
 
@@ -164,7 +165,6 @@ PROPERTY_PROMPTS = {
             Reconciliation:
             - Final value must not be lower than strong comparable-derived value
         """,
-
     "residential house": """
             Property Rules: Residential House
 
@@ -186,7 +186,6 @@ PROPERTY_PROMPTS = {
             - Redevelopment potential
             - Corner or road-facing properties
         """,
-
     "residential flat": """
             Property Rules: Residential Flat
 
@@ -218,7 +217,6 @@ PROPERTY_PROMPTS = {
             - Strong rental demand zones
             - Proximity to transit, IT parks, or CBD
         """,
-
     "commercial shop": """
             Property Rules: Commercial Shop
 
@@ -235,7 +233,6 @@ PROPERTY_PROMPTS = {
             - Cost-based valuation must NOT undercut comparable-derived value
             - Apply footfall and frontage demand premiums
         """,
-
     "industrial unit": """
     
         Property Rules: Industrial Unit   
@@ -253,7 +250,7 @@ PROPERTY_PROMPTS = {
         Constraints:
         - Cost-based value cannot undercut market-derived value
         - Consider logistics access, zoning, and warehouse demand
-      """
+      """,
 }
 
 
@@ -428,20 +425,20 @@ def generate_forecast(core_output: dict):
         }}
       """
     try:
-      client = get_openai_client()
+        client = get_openai_client()
 
-      response = client.chat.completions.create(
-          model="gpt-5.2",
-          messages=[{"role": "user", "content": prompt}],
-          temperature=0.2,
-          response_format={"type": "json_object"},
-      )
+        response = client.chat.completions.create(
+            model="gpt-5.2",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            response_format={"type": "json_object"},
+        )
 
-      return json.loads(response.choices[0].message.content)
-    
+        return json.loads(response.choices[0].message.content)
+
     except json.JSONDecodeError:
-          logger.exception("Invalid JSON in forecast response")
-          raise LLMServiceUnavailable("Forecast generation failed")
+        logger.exception("Invalid JSON in forecast response")
+        raise LLMServiceUnavailable("Forecast generation failed")
 
     except OpenAIError as e:
         logger.exception("OpenAI error during forecast")
@@ -450,7 +447,6 @@ def generate_forecast(core_output: dict):
     except Exception:
         logger.exception("Unexpected forecast failure")
         raise LLMServiceUnavailable("Forecast generation failed")
-
 
 
 def _call_openai(final_prompt: str):
@@ -462,6 +458,7 @@ def _call_openai(final_prompt: str):
         response_format={"type": "json_object"},
         temperature=0.2,
     )
+
 
 @traceable(name="generate_swot", run_type="llm")
 def generate_swot(core_output: dict):
@@ -490,7 +487,7 @@ def generate_swot(core_output: dict):
         "threats": []
         }}
         """
-        
+
     client = get_openai_client()
 
     response = client.chat.completions.create(
@@ -510,7 +507,7 @@ def generate_valuation_report(form_data: dict, plan: str = "PRO"):
 
     if not property_type:
         raise ValueError("property_type is required")
-    
+
     property_rules = PROPERTY_PROMPTS.get(
         property_type.lower(),
         f"""
@@ -520,7 +517,7 @@ def generate_valuation_report(form_data: dict, plan: str = "PRO"):
         - Use market comparables as the primary basis
         - Apply conservative, bank-grade assumptions
         - Handle non-standard or mixed-use properties logically
-        """
+        """,
     )
 
     if plan in ["PRO", "MASTER", "GLOBAL"]:

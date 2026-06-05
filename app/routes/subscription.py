@@ -1,30 +1,26 @@
-#app/routes/subscription.py
+# app/routes/subscription.py
 
-from uuid import UUID
-from typing import Optional
-
-from sqlalchemy.orm import Session
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from typing import Optional
+from uuid import UUID
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy.orm import Session
+
+from app.common import PaginatedResponse
+from app.deps import get_current_user, get_current_user_optional, get_db, pagination_params
 from app.models import User
 from app.models.country import Country
 from app.models.subscription import SubscriptionPlan, UserSubscription
-
-from app.services.pricing import get_plans_with_pricing
-
-from app.common import PaginatedResponse
 from app.routes.payment import create_order
-
-from app.utils.maps import geocode_address
+from app.services.pricing import get_plans_with_pricing
 from app.utils.date_filters import filter_by_date_range
 from app.utils.logger_config import app_logger as logger
-
-from app.deps import get_db, get_current_user, get_current_user_optional, pagination_params
-
+from app.utils.maps import geocode_address
 
 router = APIRouter(prefix="/subscription", tags=["subscription"])
-    
+
+
 @router.get("/plans")
 def list_plans(
     request: Request,
@@ -33,11 +29,7 @@ def list_plans(
 ):
     ip_country = getattr(request.state, "ip_country", None)
 
-    user_country = (
-        current_user.country.country_code
-        if current_user and current_user.country
-        else None
-    )
+    user_country = current_user.country.country_code if current_user and current_user.country else None
 
     country = ip_country or user_country or "DEFAULT"
 
@@ -88,37 +80,30 @@ def get_my_active_plans(
                 UserSubscription.start_date <= now,
                 UserSubscription.end_date >= now,
                 SubscriptionPlan.is_active == True,
-            ).filter(
-                (SubscriptionPlan.max_reports == None) |
-                (UserSubscription.reports_used < SubscriptionPlan.max_reports)
-            
+            )
+            .filter(
+                (SubscriptionPlan.max_reports == None) | (UserSubscription.reports_used < SubscriptionPlan.max_reports)
             )
             .order_by(UserSubscription.end_date.asc())
             .all()
         )
     except Exception:
         logger.exception("Failed to fetch user subscriptions")
-        raise HTTPException(
-            status_code=500,
-            detail="Could not retrieve subscriptions"
-        )
+        raise HTTPException(status_code=500, detail="Could not retrieve subscriptions")
 
     return [
         {
             "subscription_id": subscription.id,
             "plan_name": subscription.plan_name,
             "country": subscription.country_code,
-            "country_name": (
-                "Global"
-                if subscription.country_code == "GLOBAL"
-                else subscription.country_name
-            ),
+            "country_name": ("Global" if subscription.country_code == "GLOBAL" else subscription.country_name),
             "price": subscription.price,
             "currency": subscription.currency,
             "max_reports": subscription.max_reports,
             "reports_used": subscription.reports_used,
             "remaining": (
-                None if subscription.max_reports is None
+                None
+                if subscription.max_reports is None
                 else max(0, subscription.max_reports - subscription.reports_used)
             ),
             "start_date": subscription.start_date,
@@ -126,25 +111,19 @@ def get_my_active_plans(
         }
         for subscription in plans
     ]
-    
-    
-@router.get(
-    "/plan-history",
-    response_model=PaginatedResponse[dict]
-)
+
+
+@router.get("/plan-history", response_model=PaginatedResponse[dict])
 def subscription_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-
     params: dict = Depends(pagination_params),
     is_active: Optional[bool] = Query(None),
-    
     from_date: Optional[datetime] = Query(None),
     to_date: Optional[datetime] = Query(None),
 ):
     logger.info(
-        f"Fetching subscription history user_id={current_user.id} "
-        f"page={params['page']} limit={params['limit']}"
+        f"Fetching subscription history user_id={current_user.id} " f"page={params['page']} limit={params['limit']}"
     )
 
     query = (
@@ -165,17 +144,11 @@ def subscription_history(
     )
 
     if params["search"]:
-        query = query.filter(
-            SubscriptionPlan.name.ilike(
-                f"%{params['search']}%"
-            )
-        )
+        query = query.filter(SubscriptionPlan.name.ilike(f"%{params['search']}%"))
 
     if is_active is not None:
-        query = query.filter(
-            UserSubscription.is_active == is_active
-        )
-        
+        query = query.filter(UserSubscription.is_active == is_active)
+
     query = filter_by_date_range(
         query,
         UserSubscription.start_date,
@@ -188,7 +161,7 @@ def subscription_history(
     query = query.order_by(UserSubscription.start_date.desc())
     if params["limit"] is not None:
         query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
-    
+
     subs = query.all()
 
     now = datetime.now(timezone.utc)
@@ -199,20 +172,22 @@ def subscription_history(
         if end_date and end_date.tzinfo is None:
             end_date = end_date.replace(tzinfo=timezone.utc)
 
-        data.append({
-            "subscription_id": subscription.id,
-            "plan_name": subscription.plan_name,
-            "country": subscription.country_code,
-            "price": subscription.price,
-            "currency": subscription.currency,
-            "max_reports": subscription.max_reports,
-            "reports_used": subscription.reports_used,
-            "start_date": subscription.start_date,
-            "end_date": subscription.end_date,
-            "is_active": subscription.is_active,
-            "expired": end_date < now if end_date else False,
-            "purchased_on": subscription.start_date,
-        })
+        data.append(
+            {
+                "subscription_id": subscription.id,
+                "plan_name": subscription.plan_name,
+                "country": subscription.country_code,
+                "price": subscription.price,
+                "currency": subscription.currency,
+                "max_reports": subscription.max_reports,
+                "reports_used": subscription.reports_used,
+                "start_date": subscription.start_date,
+                "end_date": subscription.end_date,
+                "is_active": subscription.is_active,
+                "expired": end_date < now if end_date else False,
+                "purchased_on": subscription.start_date,
+            }
+        )
 
     return {
         "data": data,
@@ -220,7 +195,7 @@ def subscription_history(
             "page": params["page"],
             "limit": params["limit"],
             "total": total,
-        }
+        },
     }
 
 
@@ -241,18 +216,12 @@ def get_default_subscription(
                 UserSubscription.start_date <= now,
                 UserSubscription.end_date >= now,
             )
-            .order_by(
-                SubscriptionPlan.price.desc(),
-                UserSubscription.end_date.desc()
-            )
+            .order_by(SubscriptionPlan.price.desc(), UserSubscription.end_date.desc())
             .first()
         )
     except Exception:
         logger.exception("Failed to fetch default subscription")
-        raise HTTPException(
-            status_code=500,
-            detail="Could not retrieve default subscription"
-        )
+        raise HTTPException(status_code=500, detail="Could not retrieve default subscription")
 
     if not sub:
         raise HTTPException(404, "No active subscription")
@@ -260,12 +229,9 @@ def get_default_subscription(
     return {
         "subscription_id": sub.id,
         "plan": sub.plan.name,
-        "remaining": (
-            None if sub.plan.max_reports is None
-            else max(0, sub.plan.max_reports - sub.reports_used)
-        ),
+        "remaining": (None if sub.plan.max_reports is None else max(0, sub.plan.max_reports - sub.reports_used)),
     }
-    
+
 
 @router.get("/{subscription_id}/usage")
 def get_subscription_usage(
@@ -284,10 +250,7 @@ def get_subscription_usage(
     )
 
     if not subscription:
-        raise HTTPException(
-            status_code=404,
-            detail="Subscription not found"
-        )
+        raise HTTPException(status_code=404, detail="Subscription not found")
 
     now = datetime.now(timezone.utc)
 
@@ -298,11 +261,7 @@ def get_subscription_usage(
     max_reports = subscription.plan.max_reports
     reports_used = subscription.reports_used
 
-    remaining = (
-        None
-        if max_reports is None
-        else max(0, max_reports - reports_used)
-    )
+    remaining = None if max_reports is None else max(0, max_reports - reports_used)
 
     return {
         "subscription_id": subscription.id,
@@ -313,19 +272,23 @@ def get_subscription_usage(
         "expires_at": end_date,
         "is_active": subscription.is_active and end_date >= now,
     }
-    
-    
+
+
 @router.post("/{subscription_id}/cancel")
 def cancel_my_subscription(
     subscription_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    sub = db.query(UserSubscription).filter(
-        UserSubscription.id == subscription_id,
-        UserSubscription.user_id == current_user.id,
-        UserSubscription.is_active == True,
-    ).first()
+    sub = (
+        db.query(UserSubscription)
+        .filter(
+            UserSubscription.id == subscription_id,
+            UserSubscription.user_id == current_user.id,
+            UserSubscription.is_active == True,
+        )
+        .first()
+    )
 
     if not sub:
         raise HTTPException(404, "Active subscription not found")
@@ -339,7 +302,7 @@ def cancel_my_subscription(
         "message": "Subscription will cancel at period end",
         "ends_on": sub.end_date,
     }
-    
+
 
 @router.post("/{subscription_id}/renew")
 def renew_subscription(
@@ -348,10 +311,14 @@ def renew_subscription(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    sub = db.query(UserSubscription).filter(
-        UserSubscription.id == subscription_id,
-        UserSubscription.user_id == current_user.id,
-    ).first()
+    sub = (
+        db.query(UserSubscription)
+        .filter(
+            UserSubscription.id == subscription_id,
+            UserSubscription.user_id == current_user.id,
+        )
+        .first()
+    )
 
     if not sub:
         raise HTTPException(404, "Subscription not found")

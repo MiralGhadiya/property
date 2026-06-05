@@ -1,27 +1,27 @@
 # app/routes/payment.py
 
-import os
-import razorpay
-from uuid import UUID
-from dotenv import load_dotenv
-from sqlalchemy.orm import Session
 from datetime import datetime, timezone
-from dateutil.relativedelta import relativedelta
-from razorpay.errors import SignatureVerificationError
-from fastapi import APIRouter, Depends, HTTPException, Request
+from uuid import UUID
 
-from app.deps import get_db, get_current_user
-from app.models import SubscriptionPlan, UserSubscription, User
+import razorpay
+from dateutil.relativedelta import relativedelta
+from dotenv import load_dotenv
+from fastapi import APIRouter, Depends, HTTPException, Request
+from razorpay.errors import SignatureVerificationError
+from sqlalchemy.orm import Session
+
+from app.core.config_manager import get_config
+from app.deps import get_current_user, get_db
+from app.models import SubscriptionPlan, User, UserSubscription
 from app.models.subscription_settings import SubscriptionSettings
 from app.services.exchange_rate_service import get_rate
-from app.core.config_manager import get_config
-
 from app.utils.logger_config import app_logger as logger
 
 load_dotenv()
 
 # RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 # RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+
 
 def get_razorpay_client():
     key_id = get_config("RAZORPAY_KEY_ID")
@@ -32,11 +32,13 @@ def get_razorpay_client():
 
     return razorpay.Client(auth=(key_id, key_secret))
 
+
 # if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
 #     logger.error("RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is not set")
 #     raise RuntimeError("Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET")
 
 router = APIRouter(prefix="/payment", tags=["payment"])
+
 
 def _pricing_country(request: Request, current_user: User) -> str:
     ip_country = getattr(request.state, "ip_country", None)
@@ -46,33 +48,23 @@ def _pricing_country(request: Request, current_user: User) -> str:
 
 def _expire_existing_active_subs(db: Session, user_id: int, now: datetime):
     db.query(UserSubscription).filter(
-        UserSubscription.user_id == user_id,
-        UserSubscription.is_active == True,
-        UserSubscription.is_expired == False
-    ).update({
-        "is_active": False,
-        "is_expired": True,
-        "end_date": now
-    })
+        UserSubscription.user_id == user_id, UserSubscription.is_active == True, UserSubscription.is_expired == False
+    ).update({"is_active": False, "is_expired": True, "end_date": now})
 
 
 @router.post("/create-order/{plan_id}")
-
 def create_order(
     plan_id: UUID,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    
-    plan = db.query(SubscriptionPlan).filter(
-        SubscriptionPlan.id == plan_id,
-        SubscriptionPlan.is_active == True
-    ).first()
+
+    plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == plan_id, SubscriptionPlan.is_active == True).first()
 
     if not plan:
         raise HTTPException(404, "Plan not found")
-    
+
     pricing_country = _pricing_country(request, current_user)
 
     if plan.country_code == "DEFAULT":
@@ -89,13 +81,18 @@ def create_order(
         amount = int(plan.price * 100)
         currency = plan.currency
 
-    existing_pending = db.query(UserSubscription).filter(
-        UserSubscription.user_id == current_user.id,
-        UserSubscription.plan_id == plan.id,
-        UserSubscription.payment_status.in_(["CREATED", "PENDING"]),
-        UserSubscription.is_active == False
-    ).order_by(UserSubscription.id.desc()).first()
-    
+    existing_pending = (
+        db.query(UserSubscription)
+        .filter(
+            UserSubscription.user_id == current_user.id,
+            UserSubscription.plan_id == plan.id,
+            UserSubscription.payment_status.in_(["CREATED", "PENDING"]),
+            UserSubscription.is_active == False,
+        )
+        .order_by(UserSubscription.id.desc())
+        .first()
+    )
+
     if existing_pending:
         logger.info(
             f"[PAYMENT] Removing stale pending order "
@@ -137,11 +134,13 @@ def create_order(
 
     try:
         client = get_razorpay_client()
-        order = client.order.create({
-            "amount": amount,
-            "currency": currency,
-            "payment_capture": 1,
-        })
+        order = client.order.create(
+            {
+                "amount": amount,
+                "currency": currency,
+                "payment_capture": 1,
+            }
+        )
 
         sub = UserSubscription(
             user_id=current_user.id,
@@ -167,7 +166,7 @@ def create_order(
             "amount": amount,
             # "currency": plan.currency,
             "currency": currency,
-            "subscription_id": sub.id
+            "subscription_id": sub.id,
         }
     except razorpay.errors.BadRequestError:
         db.rollback()
@@ -184,7 +183,7 @@ def create_order(
         logger.exception("Unexpected error during order creation")
         raise HTTPException(500, "Unable to create payment order")
 
-        
+
 @router.post("/verify")
 def verify_payment(
     data: dict,
@@ -193,24 +192,28 @@ def verify_payment(
 ):
     try:
         client = get_razorpay_client()
-        client.utility.verify_payment_signature({
-            "razorpay_order_id": data["razorpay_order_id"],
-            "razorpay_payment_id": data["razorpay_payment_id"],
-            "razorpay_signature": data["razorpay_signature"],
-        })
+        client.utility.verify_payment_signature(
+            {
+                "razorpay_order_id": data["razorpay_order_id"],
+                "razorpay_payment_id": data["razorpay_payment_id"],
+                "razorpay_signature": data["razorpay_signature"],
+            }
+        )
 
-        sub = db.query(UserSubscription).filter(
-            UserSubscription.razorpay_order_id == data["razorpay_order_id"],
-            UserSubscription.user_id == current_user.id
-        ).first()
+        sub = (
+            db.query(UserSubscription)
+            .filter(
+                UserSubscription.razorpay_order_id == data["razorpay_order_id"],
+                UserSubscription.user_id == current_user.id,
+            )
+            .first()
+        )
 
         if not sub:
             raise HTTPException(404, "Subscription not found")
 
         if sub.payment_status == "PAID" and sub.is_active:
-            return {"message": "Already activated",
-                    "subscription_id": str(sub.id)
-                    }
+            return {"message": "Already activated", "subscription_id": str(sub.id)}
 
         # ✅ DEFINE NOW FIRST
         now = datetime.now(timezone.utc)
@@ -226,7 +229,7 @@ def verify_payment(
         sub.is_expired = False
         sub.start_date = now
         # sub.end_date = now + relativedelta(years=2)
-                
+
         settings = db.query(SubscriptionSettings).first()
 
         if not settings:
@@ -247,10 +250,7 @@ def verify_payment(
 
         db.commit()
 
-        return {
-            "message": "Payment successful & subscription activated",
-            "subscription_id": str(sub.id)
-        }
+        return {"message": "Payment successful & subscription activated", "subscription_id": str(sub.id)}
 
     except SignatureVerificationError:
         raise HTTPException(400, "Invalid payment signature")

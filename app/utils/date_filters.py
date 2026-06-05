@@ -1,14 +1,14 @@
 # app/utils/date_filters.py
 
 from datetime import datetime, timezone
-from typing import Optional, Tuple
+from typing import Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Query
 from sqlalchemy.sql.elements import ColumnElement
 
-
 # ---------- STEP 1: NORMALIZATION ----------
+
 
 def to_utc(dt: Optional[datetime]) -> Optional[datetime]:
     if dt is None:
@@ -32,14 +32,13 @@ def normalize_date_range(
 
     # inclusive end-of-day
     if to_dt:
-        to_dt = to_dt.replace(
-            hour=23, minute=59, second=59, microsecond=999999
-        )
+        to_dt = to_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
 
     return from_dt, to_dt
 
 
 # ---------- STEP 2: APPLY FILTER ----------
+
 
 def apply_date_range(
     query: Query,
@@ -57,6 +56,7 @@ def apply_date_range(
 
 
 # ---------- STEP 3: ONE-LINE WRAPPER ----------
+
 
 def filter_by_date_range(
     query: Query,

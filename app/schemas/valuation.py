@@ -1,14 +1,11 @@
-#app/schemas/valuation.py
+# app/schemas/valuation.py
 
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.admin import (
-    ValuationAiResponseBlob,
-    ValuationJsonBlob,
-    ValuationReportContextBlob,
-)
+from app.schemas.admin import ValuationAiResponseBlob, ValuationJsonBlob, ValuationReportContextBlob
 
 
 class ValuationResponse(BaseModel):
@@ -89,9 +86,7 @@ class ValuationDetailResponse(ValuationResponse):
                 "report_context": {
                     "currency_code": "AED",
                     "future_outlook": [],
-                    "property_maps": {
-                        "static_map_url": "https://maps.example/static-map"
-                    },
+                    "property_maps": {"static_map_url": "https://maps.example/static-map"},
                 },
             }
         },

@@ -2,39 +2,23 @@
 
 import base64
 import uuid
-from uuid import UUID
-from typing import Optional
 from datetime import datetime
+from typing import Optional
 
-from fastapi import (
-    APIRouter,
-    HTTPException,
-    UploadFile,
-    File,
-    Depends,
-    Form,
-    Query,
-    Request,
-)
-from sqlalchemy.orm import Session, undefer_group
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from sqlalchemy import or_
+from sqlalchemy.orm import Session, undefer_group
 
-from app.database.db import get_db
 from app.common import PaginatedResponse
+from app.database.db import get_db
 from app.deps import get_current_user, pagination_params
-from app.tasks.valuation_tasks import process_valuation_job, send_report_email_task
-from app.services.subscription_service import get_usable_subscription_with_fallback
-
 from app.models import User, ValuationReport
-from app.models.valuation import (
-    DesktopValuationForm,
-    ValuationJob,
-    desktop_valuation_form_dep,
-)
-from app.utils.maps import geocode_address
+from app.models.valuation import DesktopValuationForm, ValuationJob, desktop_valuation_form_dep
+from app.services.subscription_service import get_usable_subscription_with_fallback
+from app.tasks.valuation_tasks import process_valuation_job, send_report_email_task
 from app.utils.date_filters import filter_by_date_range
 from app.utils.logger_config import app_logger as logger
-
+from app.utils.maps import geocode_address
 
 router = APIRouter()
 
@@ -50,9 +34,7 @@ async def create_valuation_form(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    logger.info(
-        f"Valuation request started user_id={current_user.id}"
-    )
+    logger.info(f"Valuation request started user_id={current_user.id}")
 
     try:
         user_input = form.model_dump()
@@ -94,7 +76,7 @@ async def create_valuation_form(
         raise HTTPException(
             400,
             f"Resolved plan country ({subscription.plan.country_code}) "
-            f"is not valid for property location ({detected_country})"
+            f"is not valid for property location ({detected_country})",
         )
 
     country_code = detected_country
@@ -137,8 +119,8 @@ async def create_valuation_form(
         #     else subscription.plan.max_reports - subscription.reports_used - 1
         # ),
     }
-    
-    
+
+
 # ==========================================================
 # MY VALUATIONS
 # ==========================================================
@@ -154,15 +136,12 @@ def my_valuations(
     from_date: Optional[datetime] = Query(None),
     to_date: Optional[datetime] = Query(None),
 ):
-    query = (
-        db.query(
-            ValuationReport.valuation_id,
-            ValuationReport.category,
-            ValuationReport.country_code,
-            ValuationReport.created_at,
-        )
-        .filter(ValuationReport.user_id == current_user.id)
-    )
+    query = db.query(
+        ValuationReport.valuation_id,
+        ValuationReport.category,
+        ValuationReport.country_code,
+        ValuationReport.created_at,
+    ).filter(ValuationReport.user_id == current_user.id)
 
     if category:
         query = query.filter(ValuationReport.category == category)
@@ -170,15 +149,9 @@ def my_valuations(
     if params["search"]:
         query = query.filter(
             or_(
-                ValuationReport.valuation_id.ilike(
-                    f"%{params['search']}%"
-                ),
-                ValuationReport.category.ilike(
-                    f"%{params['search']}%"
-                ),
-                ValuationReport.country_code.ilike(
-                    f"%{params['search']}%"
-                ),
+                ValuationReport.valuation_id.ilike(f"%{params['search']}%"),
+                ValuationReport.category.ilike(f"%{params['search']}%"),
+                ValuationReport.country_code.ilike(f"%{params['search']}%"),
             )
         )
 
@@ -194,7 +167,7 @@ def my_valuations(
     query = query.order_by(ValuationReport.created_at.desc())
     if params["limit"] is not None:
         query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
-    
+
     records = query.all()
 
     return {
@@ -292,7 +265,7 @@ def get_job_status(
 
     if not valuation:
         raise HTTPException(404, "Valuation not found")
-    
+
     # country = (
     #     db.query(Country)
     #     .filter(Country.country_code == valuation.country_code)
@@ -300,7 +273,7 @@ def get_job_status(
     # )
 
     # currency_code = country.currency_code if country else None
-    
+
     currency_code = valuation.report_context.get("currency_code")
 
     return {

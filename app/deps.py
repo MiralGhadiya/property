@@ -13,7 +13,6 @@ from app.database.db import get_db
 from app.models.staff import Staff
 from app.utils.logger_config import app_logger as logger
 
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login", auto_error=False)
 
 

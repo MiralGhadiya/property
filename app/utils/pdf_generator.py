@@ -1,20 +1,17 @@
 import os
 import uuid
-import asyncio
+
 from jinja2 import Environment, FileSystemLoader
 from playwright.sync_api import sync_playwright
-from app.utils.logger_config import app_logger as logger
 
+from app.utils.logger_config import app_logger as logger
 
 TEMPLATE_DIR = "app/templates"
 OUTPUT_DIR = "generated_reports"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
-env = Environment(
-    loader=FileSystemLoader(TEMPLATE_DIR),
-    auto_reload=True
-)
+env = Environment(loader=FileSystemLoader(TEMPLATE_DIR), auto_reload=True)
 env.cache = {}
 
 

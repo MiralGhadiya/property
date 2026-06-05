@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from sqlalchemy import inspect, text
+
+import app.models  # noqa: F401  Ensures all models are registered on Base.metadata.
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
@@ -9,12 +12,8 @@ from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from alembic.script.revision import ResolutionError
 from alembic.util.exc import CommandError
-from sqlalchemy import inspect, text
-
-import app.models  # noqa: F401  Ensures all models are registered on Base.metadata.
 from app.database.db import Base, engine, get_database_url
 from app.utils.logger_config import app_logger as logger
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ALEMBIC_INI_PATH = PROJECT_ROOT / "alembic.ini"
@@ -32,10 +31,7 @@ def get_single_head_revision(script_directory: ScriptDirectory) -> str:
     heads = script_directory.get_heads()
 
     if len(heads) != 1:
-        raise RuntimeError(
-            "Expected exactly one Alembic head revision, "
-            f"found {len(heads)}: {heads}"
-        )
+        raise RuntimeError("Expected exactly one Alembic head revision, " f"found {len(heads)}: {heads}")
 
     return heads[0]
 
@@ -47,9 +43,7 @@ def get_current_revisions(connection) -> tuple[str, ...]:
     if "alembic_version" not in table_names:
         return ()
 
-    revisions = connection.execute(
-        text("SELECT version_num FROM alembic_version ORDER BY version_num")
-    ).scalars().all()
+    revisions = connection.execute(text("SELECT version_num FROM alembic_version ORDER BY version_num")).scalars().all()
 
     return tuple(revisions)
 
@@ -88,15 +82,11 @@ def format_diffs(diffs: list, limit: int = 5) -> str:
 
 
 def rewrite_alembic_version(connection, head_revision: str) -> None:
-    connection.execute(
-        text(
-            """
+    connection.execute(text("""
             CREATE TABLE IF NOT EXISTS alembic_version (
                 version_num VARCHAR(32) NOT NULL PRIMARY KEY
             )
-            """
-        )
-    )
+            """))
     connection.execute(text("DELETE FROM alembic_version"))
     connection.execute(
         text("INSERT INTO alembic_version (version_num) VALUES (:head_revision)"),
@@ -116,9 +106,7 @@ def reconcile_version_table_if_needed(
             return False
 
         unknown_revisions = tuple(
-            revision
-            for revision in current_revisions
-            if not is_known_revision(script_directory, revision)
+            revision for revision in current_revisions if not is_known_revision(script_directory, revision)
         )
 
         needs_reconciliation = bool(unknown_revisions) or not current_revisions
@@ -137,9 +125,7 @@ def reconcile_version_table_if_needed(
 
         if diffs:
             current_state = (
-                f"unknown revision(s) {unknown_revisions}"
-                if unknown_revisions
-                else "missing alembic_version rows"
+                f"unknown revision(s) {unknown_revisions}" if unknown_revisions else "missing alembic_version rows"
             )
             raise RuntimeError(
                 "Database schema cannot be auto-reconciled because the live "

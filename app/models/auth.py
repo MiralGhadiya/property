@@ -1,14 +1,15 @@
-#app/models/auth.py
+# app/models/auth.py
 
-import uuid
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
+
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
-from app.database.mixins import UUIDPrimaryKeyMixin
 
 from app.database.db import Base
+from app.database.mixins import UUIDPrimaryKeyMixin
 
 USER_ID_FK = "users.id"
+
 
 class EmailVerificationToken(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "email_verification_tokens"

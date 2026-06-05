@@ -1,38 +1,31 @@
 # app/tasks/valuation_tasks.py
 
+import base64
 import io
 import os
-import base64
 import smtplib
-from sqlalchemy import text
 from datetime import datetime, timezone
+
 import matplotlib.pyplot as plt
+from sqlalchemy import text
+
 from app.celery_app import celery_app
 from app.database.db import SessionLocal
+from app.llm.openai import generate_forecast, generate_swot, generate_valuation_report
+from app.models.subscription import UserSubscription
 from app.models.valuation import ValuationJob, ValuationReport
 from app.services.subscription_service import increment_usage
-from app.services.valuation_service import save_valuation_report
 from app.services.valuation_report_builder import build_report_context
-from app.llm.openai import (
-    generate_valuation_report,
-    generate_forecast,
-    generate_swot,
-)
+from app.services.valuation_service import save_valuation_report
 from app.utils.email import send_pdf_email
-from app.utils.maps import geocode_address, build_static_maps
-from app.models.subscription import UserSubscription
-
 from app.utils.logger_config import app_logger as logger
+from app.utils.maps import build_static_maps, geocode_address
 
 
 def get_currency_from_country(db, country_code):
     from app.models.country import Country
 
-    country = (
-        db.query(Country)
-        .filter(Country.country_code == country_code)
-        .first()
-    )
+    country = db.query(Country).filter(Country.country_code == country_code).first()
 
     if not country:
         return "USD"
@@ -45,11 +38,7 @@ def build_calculation_input(user_input: dict):
     Keep user values only if provided.
     Remove empty fields so AI can infer them.
     """
-    return {
-        k: v
-        for k, v in user_input.items()
-        if v not in [None, "", "null"]
-    }
+    return {k: v for k, v in user_input.items() if v not in [None, "", "null"]}
 
 
 def get_next_valuation_sequence(db) -> int:
@@ -59,27 +48,19 @@ def get_next_valuation_sequence(db) -> int:
     """
     db.execute(text("SELECT pg_advisory_xact_lock(:lock_key)"), {"lock_key": 482001})
 
-    sequence_exists = db.execute(
-        text("SELECT to_regclass('public.valuation_seq')")
-    ).scalar()
+    sequence_exists = db.execute(text("SELECT to_regclass('public.valuation_seq')")).scalar()
 
     if sequence_exists is None:
-        db.execute(
-            text("CREATE SEQUENCE valuation_seq START WITH 1 INCREMENT BY 1")
-        )
+        db.execute(text("CREATE SEQUENCE valuation_seq START WITH 1 INCREMENT BY 1"))
 
-        max_existing_suffix = db.execute(
-            text(
-                """
+        max_existing_suffix = db.execute(text("""
                 SELECT COALESCE(
                     MAX(CAST(split_part(valuation_id, '-', 3) AS BIGINT)),
                     0
                 )
                 FROM valuation_reports
                 WHERE valuation_id ~ '^DV-[0-9]{8}-[0-9]+$'
-                """
-            )
-        ).scalar()
+                """)).scalar()
 
         if max_existing_suffix:
             db.execute(
@@ -110,26 +91,21 @@ def process_valuation_job(self, job_id: str):
         user_input = job.request_payload
 
         # ai_json = generate_valuation_report(user_input)
-        
-        subscription = (
-            db.query(UserSubscription)
-            .filter(UserSubscription.id == job.subscription_id)
-            .first()
-        )
-        
+
+        subscription = db.query(UserSubscription).filter(UserSubscription.id == job.subscription_id).first()
+
         plan_name = subscription.plan.name.upper()
-        
+
         # core = generate_valuation_report(user_input, plan=plan_name)
-        
+
         calculation_input = build_calculation_input(user_input)
         core = generate_valuation_report(calculation_input, plan=plan_name)
-        
+
         if plan_name != "BASIC":
             forecast = generate_forecast(core)
             core["forecast"] = forecast
         else:
             core["forecast"] = None
-            
 
         # forecast = generate_forecast(core)
         # core["forecast"] = forecast
@@ -143,7 +119,7 @@ def process_valuation_job(self, job_id: str):
         #         "opportunities": [],
         #         "threats": []
         #     }
-        
+
         if plan_name in ["PRO", "MASTER", "GLOBAL"]:
             try:
                 # Ensure bank_lending_model exists
@@ -152,7 +128,7 @@ def process_valuation_job(self, job_id: str):
                         "recommended_ltv": 0,
                         "safe_lending_value": 0,
                         "risk_level": "medium",
-                        "reason": ""
+                        "reason": "",
                     }
 
                 elif "risk_level" not in core["bank_lending_model"]:
@@ -162,42 +138,37 @@ def process_valuation_job(self, job_id: str):
 
             except Exception as e:
                 logger.warning(f"SWOT generation failed: {e}")
-                core["swot_analysis"] = {
-                    "strengths": [],
-                    "weaknesses": [],
-                    "opportunities": [],
-                    "threats": []
-                }
+                core["swot_analysis"] = {"strengths": [], "weaknesses": [], "opportunities": [], "threats": []}
 
         ai_json = core
         ai_json["valuation_validity_days"] = 60
         # valuation_id = f"DV-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{str(uuid4())[:8]}"
-        
+
         today = datetime.now(timezone.utc).strftime("%Y%m%d")
 
         seq = get_next_valuation_sequence(db)
 
         valuation_id = f"DV-{today}-{seq:04d}"
-                
+
         logger.debug("AI JSON response generated for job_id=%s", job_id)
         logger.debug("Forecast generated for job_id=%s forecast=%s", job_id, ai_json.get("forecast"))
-    
+
         context = build_report_context(ai_json, user_input, valuation_id=valuation_id)
-        
+
         if plan_name != "BASIC" and context["future_outlook"]:
             years = [item["year"] for item in context["future_outlook"]]
             values = [item["expected_value"] for item in context["future_outlook"]]
 
             plt.figure(figsize=(6, 4))
-            plt.plot(years, values, marker='o')
+            plt.plot(years, values, marker="o")
 
             for i, txt in enumerate(context["future_outlook"]):
                 plt.annotate(
                     f"{txt['growth_percent']}%",
                     (years[i], values[i]),
                     textcoords="offset points",
-                    xytext=(0,10),
-                    ha='center'
+                    xytext=(0, 10),
+                    ha="center",
                 )
 
             plt.title("5-Year Price Forecast")
@@ -214,7 +185,7 @@ def process_valuation_job(self, job_id: str):
             context["forecast_chart"] = image_base64
         else:
             context["forecast_chart"] = []
-        
+
         address = ai_json["property_details"]["address"]
 
         # 3️⃣ Geocode
@@ -223,11 +194,7 @@ def process_valuation_job(self, job_id: str):
         currency_code = "USD"
 
         if geo:
-            context["property_maps"] = build_static_maps(
-                geo["lat"],
-                geo["lng"],
-                address
-            )
+            context["property_maps"] = build_static_maps(geo["lat"], geo["lng"], address)
 
             detected_country = geo.get("country_code")
 
@@ -236,7 +203,7 @@ def process_valuation_job(self, job_id: str):
 
         else:
             context["property_maps"] = None
-            
+
         context["currency_code"] = currency_code
 
         # if geo:
@@ -251,7 +218,7 @@ def process_valuation_job(self, job_id: str):
         #     # }
         # else:
         #     context["property_identification"]["location"] = None
-            
+
         # html = render_html("valuation_template.html", context)
         # pdf_path = generate_pdf_from_html(html)
 
@@ -261,7 +228,7 @@ def process_valuation_job(self, job_id: str):
         #     message=f"Dear {user_input['full_name']},\n\nPlease find attached your valuation report.",
         #     pdf_path=pdf_path,
         # )
-        
+
         # valuation_id = str(uuid4())
         # valuation_id = f"DV-{datetime.utcnow().strftime('%Y%m%d')}-{str(uuid4())[:8]}"
 
@@ -303,9 +270,8 @@ def process_valuation_job(self, job_id: str):
         raise
     finally:
         db.close()
-        
 
-        
+
 @celery_app.task(
     bind=True,
     autoretry_for=(smtplib.SMTPException, ConnectionError),
@@ -323,9 +289,7 @@ def send_report_email_task(
     temp_path = None
 
     try:
-        logger.info(
-            f"Email task started valuation_id={valuation_id} user_id={user_id}"
-        )
+        logger.info(f"Email task started valuation_id={valuation_id} user_id={user_id}")
 
         valuation = (
             db.query(ValuationReport)
@@ -354,7 +318,7 @@ def send_report_email_task(
             subject="Your Desktop Valuation Report",
             client_name=client_name,
             pdf_bytes=pdf_bytes,
-            filename=original_filename,  
+            filename=original_filename,
         )
 
         logger.info(f"Email sent successfully valuation_id={valuation_id}")

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+
 from app.database.db import get_db
 from app.models.inquiry import Inquiry
 from app.schemas.inquiry import InquiryCreate
@@ -26,10 +27,7 @@ def create_inquiry(
         # Optional: Send email to admin
         # send_admin_feedback_email(...)
 
-        return {
-            "message": "Thank you! We’ll get back to you shortly.",
-            "inquiry_id": inquiry.id
-        }
+        return {"message": "Thank you! We’ll get back to you shortly.", "inquiry_id": inquiry.id}
 
     except Exception:
         db.rollback()

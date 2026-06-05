@@ -1,4 +1,4 @@
-#app/services/subscription_service.py
+# app/services/subscription_service.py
 
 from datetime import datetime, time, timedelta, timezone
 from io import BytesIO
@@ -8,12 +8,11 @@ from uuid import UUID
 import pandas as pd
 from fastapi import HTTPException
 from sqlalchemy import case
-from sqlalchemy.orm import Session, contains_eager, load_only, selectinload
+from sqlalchemy.orm import Session, contains_eager, selectinload
 
 from app.models.subscription import SubscriptionPlan, UserSubscription
 from app.utils.email import send_subscription_expiry_email
 from app.utils.logger_config import app_logger as logger
-
 
 GLOBAL_COUNTRY_CODE = "GLOBAL"
 DEFAULT_COUNTRY_CODE = "DEFAULT"
@@ -86,41 +85,30 @@ def get_active_subscription(
     user_id: UUID,
     country_code: str,
 ):
-    logger.debug(
-        f"Fetching active subscription user_id={user_id} country={country_code}"
-    )
+    logger.debug(f"Fetching active subscription user_id={user_id} country={country_code}")
 
-    local_sub = (
-        _base_usable_subscription_query(
-            db=db,
-            user_id=user_id,
-            country_code=country_code,
-        )
-        .first()
-    )
+    local_sub = _base_usable_subscription_query(
+        db=db,
+        user_id=user_id,
+        country_code=country_code,
+    ).first()
     if local_sub:
         return local_sub
 
-    global_sub = (
-        _base_usable_subscription_query(
-            db=db,
-            user_id=user_id,
-            country_code=GLOBAL_COUNTRY_CODE,
-        )
-        .first()
-    )
+    global_sub = _base_usable_subscription_query(
+        db=db,
+        user_id=user_id,
+        country_code=GLOBAL_COUNTRY_CODE,
+    ).first()
     if global_sub:
         return global_sub
 
     if country_code != DEFAULT_COUNTRY_CODE:
-        return (
-            _base_usable_subscription_query(
-                db=db,
-                user_id=user_id,
-                country_code=DEFAULT_COUNTRY_CODE,
-            )
-            .first()
-        )
+        return _base_usable_subscription_query(
+            db=db,
+            user_id=user_id,
+            country_code=DEFAULT_COUNTRY_CODE,
+        ).first()
 
     return None
 
@@ -131,10 +119,7 @@ def enforce_subscription(
     user_id: UUID,
     subscription_id: UUID,
 ):
-    logger.info(
-        f"Enforcing subscription user_id={user_id} "
-        f"subscription_id={subscription_id}"
-    )
+    logger.info(f"Enforcing subscription user_id={user_id} " f"subscription_id={subscription_id}")
 
     sub = (
         db.query(UserSubscription)
@@ -176,10 +161,7 @@ def enforce_subscription(
         raise HTTPException(403, "Subscription is missing validity dates")
 
     if start_date > now or end_date < now:
-        logger.warning(
-            f"Subscription time invalid | "
-            f"start={start_date} end={end_date} now={now}"
-        )
+        logger.warning(f"Subscription time invalid | " f"start={start_date} end={end_date} now={now}")
         raise HTTPException(403, "Subscription is not valid at this time")
 
     plan = sub.plan
@@ -283,15 +265,11 @@ def send_expiry_reminders(db: Session):
 
     for sub in subscriptions:
         if not sub.end_date:
-            logger.warning(
-                f"[EXPIRY REMINDER] Subscription id={sub.id} has no end_date"
-            )
+            logger.warning(f"[EXPIRY REMINDER] Subscription id={sub.id} has no end_date")
             continue
 
         if not sub.plan:
-            logger.warning(
-                f"[EXPIRY REMINDER] Subscription id={sub.id} has no plan relation"
-            )
+            logger.warning(f"[EXPIRY REMINDER] Subscription id={sub.id} has no plan relation")
             continue
 
         days_left = (to_utc_aware(sub.end_date).date() - today).days
@@ -306,15 +284,11 @@ def send_expiry_reminders(db: Session):
         user = sub.user
 
         if not user:
-            logger.warning(
-                f"[EXPIRY REMINDER] sub_id={sub.id} has no user relation"
-            )
+            logger.warning(f"[EXPIRY REMINDER] sub_id={sub.id} has no user relation")
             continue
 
         if not user.email:
-            logger.warning(
-                f"[EXPIRY REMINDER] user_id={user.id} has no email"
-            )
+            logger.warning(f"[EXPIRY REMINDER] user_id={user.id} has no email")
             continue
 
         logger.info(
@@ -332,14 +306,9 @@ def send_expiry_reminders(db: Session):
             sent += 1
 
         except Exception:
-            logger.exception(
-                f"[EXPIRY REMINDER] FAILED sending email | "
-                f"user_id={user.id} sub_id={sub.id}"
-            )
+            logger.exception(f"[EXPIRY REMINDER] FAILED sending email | " f"user_id={user.id} sub_id={sub.id}")
 
-    logger.info(
-        f"[EXPIRY REMINDER] Job finished | emails_sent={sent}"
-    )
+    logger.info(f"[EXPIRY REMINDER] Job finished | emails_sent={sent}")
 
     return {"emails_sent": sent}
 
@@ -446,8 +415,7 @@ def _create_subscription_plan(
     db.add(plan)
     existing_plans[(country_code, plan_name)] = plan
     created_plans.append(
-        "GLOBAL" if country_code == GLOBAL_COUNTRY_CODE and plan_name == "GLOBAL"
-        else f"{plan_name}-{country_code}"
+        "GLOBAL" if country_code == GLOBAL_COUNTRY_CODE and plan_name == "GLOBAL" else f"{plan_name}-{country_code}"
     )
 
 
@@ -474,9 +442,7 @@ def add_subscription_plans_from_excel(
         if df.empty:
             raise HTTPException(400, "Excel file does not contain any plan rows")
 
-        df["country_code"] = (
-            df["country_code"].map(_normalize_excel_text).str.upper()
-        )
+        df["country_code"] = df["country_code"].map(_normalize_excel_text).str.upper()
         df["currency"] = df["currency"].map(_normalize_excel_text)
         df["plan_type"] = df["plan_type"].map(_normalize_excel_text)
         df["plan_name"] = df["plan_name"].map(_normalize_excel_text)
@@ -496,11 +462,7 @@ def add_subscription_plans_from_excel(
         country_codes.add(GLOBAL_COUNTRY_CODE)
 
         existing_plans = {}
-        for plan in (
-            db.query(SubscriptionPlan)
-            .filter(SubscriptionPlan.country_code.in_(country_codes))
-            .all()
-        ):
+        for plan in db.query(SubscriptionPlan).filter(SubscriptionPlan.country_code.in_(country_codes)).all():
             existing_plans.setdefault(
                 (plan.country_code.upper(), plan.name.upper()),
                 plan,
@@ -515,9 +477,7 @@ def add_subscription_plans_from_excel(
                 continue
 
             sample_row = group.iloc[0]
-            default_currency = _normalize_excel_text(
-                sample_row.get("currency")
-            ).upper()
+            default_currency = _normalize_excel_text(sample_row.get("currency")).upper()
             rows_by_plan_type = {}
 
             for _, row in group.iterrows():
@@ -587,9 +547,7 @@ def add_subscription_plans_from_excel(
             else:
                 master_reports = 10
                 master_payload = {
-                    "price": int(
-                        round(int(pro_payload["price"]) * master_reports * 0.8)
-                    ),
+                    "price": int(round(int(pro_payload["price"]) * master_reports * 0.8)),
                     "currency": str(pro_payload["currency"]),
                     "max_reports": master_reports,
                 }
@@ -666,9 +624,7 @@ def get_usable_subscription(
     user_id: UUID,
     country_code: str,
 ):
-    logger.debug(
-        f"Fetching usable subscription user_id={user_id} country={country_code}"
-    )
+    logger.debug(f"Fetching usable subscription user_id={user_id} country={country_code}")
 
     subs = _base_usable_subscription_query(
         db=db,

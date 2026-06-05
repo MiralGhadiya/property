@@ -16,7 +16,6 @@ from app.scripts.config_seed import load_config_seed_values
 from app.services.subscription_service import add_subscription_plans_from_excel
 from app.utils.logger_config import app_logger as logger
 
-
 load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -70,18 +69,18 @@ def import_env_variables(db: Session) -> None:
         if value is None:
             continue
 
-        existing = db.query(SystemConfig).filter(
-            SystemConfig.config_key == key
-        ).first()
+        existing = db.query(SystemConfig).filter(SystemConfig.config_key == key).first()
 
         if existing:
             logger.info(f"Skipping existing config: {key}")
             continue
 
-        db.add(SystemConfig(
-            config_key=key,
-            config_value=value,
-        ))
+        db.add(
+            SystemConfig(
+                config_key=key,
+                config_value=value,
+            )
+        )
 
         logger.info(f"Inserted config: {key}")
 
@@ -89,9 +88,7 @@ def import_env_variables(db: Session) -> None:
 def import_countries(db: Session, csv_path: Path) -> None:
     try:
         existing_country_codes = {
-            country_code
-            for (country_code,) in db.query(Country.country_code).all()
-            if country_code
+            country_code for (country_code,) in db.query(Country.country_code).all() if country_code
         }
 
         with csv_path.open(newline="", encoding="utf-8") as csvfile:
@@ -105,12 +102,14 @@ def import_countries(db: Session, csv_path: Path) -> None:
                     logger.info(f"Skipping existing country: {country_code}")
                     continue
 
-                db.add(Country(
-                    name=row["name"].strip(),
-                    country_code=country_code,
-                    dial_code=dial_code,
-                    currency_code=row.get("currency_code", "").strip() or None,
-                ))
+                db.add(
+                    Country(
+                        name=row["name"].strip(),
+                        country_code=country_code,
+                        dial_code=dial_code,
+                        currency_code=row.get("currency_code", "").strip() or None,
+                    )
+                )
                 existing_country_codes.add(country_code)
 
         # SessionLocal is configured with autoflush disabled, so flush here
@@ -129,23 +128,21 @@ def setup_subscription_settings(db: Session) -> None:
         logger.info("Subscription settings already exist")
         return
 
-    db.add(SubscriptionSettings(
-        id=1,
-        subscription_duration_days=365,
-    ))
+    db.add(
+        SubscriptionSettings(
+            id=1,
+            subscription_duration_days=365,
+        )
+    )
 
     logger.info("Subscription settings created")
 
 
 def get_country_by_code(db: Session, country_code: str) -> Country:
-    country = db.query(Country).filter(
-        Country.country_code == country_code
-    ).first()
+    country = db.query(Country).filter(Country.country_code == country_code).first()
 
     if not country:
-        raise ValueError(
-            f"Country not found for mobile number country code {country_code}"
-        )
+        raise ValueError(f"Country not found for mobile number country code {country_code}")
 
     return country
 
@@ -154,9 +151,7 @@ def get_existing_management_user(
     db: Session,
     user_data: dict[str, object],
 ) -> User | None:
-    return db.query(User).filter(
-        User.email == user_data["email"]
-    ).first()
+    return db.query(User).filter(User.email == user_data["email"]).first()
 
 
 def build_mobile_number_candidate(base_mobile_number: str, offset: int) -> str:
@@ -195,8 +190,7 @@ def seed_management_users(db: Session) -> None:
 
         if existing_user:
             logger.info(
-                "Skipping existing management user "
-                f"email={user_data['email']} username={user_data['username']}"
+                "Skipping existing management user " f"email={user_data['email']} username={user_data['username']}"
             )
             continue
 
@@ -213,31 +207,28 @@ def seed_management_users(db: Session) -> None:
                 f"email={user_data['email']}"
             )
 
-        db.add(User(
-            email=user_data["email"],
-            role=user_data["role"],
-            username=user_data["username"],
-            mobile_number=assigned_mobile_number,
-            country_id=country.id,
-            hashed_password=pwd_context.hash(user_data["password"]),
-            is_active=True,
-            is_superuser=user_data["is_superuser"],
-            is_email_verified=True,
-            email_verified_at=datetime.now(timezone.utc),
-        ))
+        db.add(
+            User(
+                email=user_data["email"],
+                role=user_data["role"],
+                username=user_data["username"],
+                mobile_number=assigned_mobile_number,
+                country_id=country.id,
+                hashed_password=pwd_context.hash(user_data["password"]),
+                is_active=True,
+                is_superuser=user_data["is_superuser"],
+                is_email_verified=True,
+                email_verified_at=datetime.now(timezone.utc),
+            )
+        )
         db.flush()
 
-        logger.info(
-            "Seeded management user "
-            f"email={user_data['email']} role={user_data['role']}"
-        )
+        logger.info("Seeded management user " f"email={user_data['email']} role={user_data['role']}")
 
 
 def import_subscription_plans(db: Session, excel_path: Path) -> None:
     if not excel_path.exists():
-        raise FileNotFoundError(
-            f"Subscription plans Excel file not found: {excel_path}"
-        )
+        raise FileNotFoundError(f"Subscription plans Excel file not found: {excel_path}")
 
     with excel_path.open("rb") as excel_file:
         created_plans = add_subscription_plans_from_excel(
@@ -246,10 +237,7 @@ def import_subscription_plans(db: Session, excel_path: Path) -> None:
         )
 
     if created_plans:
-        logger.info(
-            "Subscription plans import completed "
-            f"created={created_plans}"
-        )
+        logger.info("Subscription plans import completed " f"created={created_plans}")
     else:
         logger.info("Subscription plans import completed with no new plans created")
 

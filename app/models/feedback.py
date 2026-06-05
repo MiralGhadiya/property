@@ -1,12 +1,14 @@
-#app/models/feedback.py
+# app/models/feedback.py
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, Text, Index
-from sqlalchemy.orm import relationship
+
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
-from app.database.mixins import UUIDPrimaryKeyMixin
+from sqlalchemy.orm import relationship
 
 from app.database.db import Base
+from app.database.mixins import UUIDPrimaryKeyMixin
+
 
 class Feedback(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "feedback"
@@ -17,16 +19,7 @@ class Feedback(UUIDPrimaryKeyMixin, Base):
 
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
 
-    type = Column(
-        Enum(
-            "GENERAL",
-            "VALUATION",
-            "PAYMENT",
-            "SUBSCRIPTION",
-            name="feedback_type"
-        ),
-        nullable=False
-    )
+    type = Column(Enum("GENERAL", "VALUATION", "PAYMENT", "SUBSCRIPTION", name="feedback_type"), nullable=False)
 
     subject = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
@@ -37,13 +30,7 @@ class Feedback(UUIDPrimaryKeyMixin, Base):
     subscription_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
     status = Column(
-        Enum(
-            "OPEN",
-            "IN_PROGRESS",
-            "RESOLVED",
-            "CLOSED",
-            name="feedback_status"
-        ),
+        Enum("OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED", name="feedback_status"),
         default="OPEN",
         index=True,
     )
@@ -52,5 +39,5 @@ class Feedback(UUIDPrimaryKeyMixin, Base):
 
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, index=True)
     updated_at = Column(DateTime(timezone=True), onupdate=datetime.utcnow)
-    
+
     user = relationship("User", backref="feedbacks", lazy="selectin")

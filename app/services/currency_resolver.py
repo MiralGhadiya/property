@@ -1,6 +1,7 @@
 # app/services/currency_resolver.py
 
 from babel.numbers import get_territory_currencies
+
 from app.services.exchange_rate_service import get_rate
 
 

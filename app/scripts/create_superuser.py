@@ -37,9 +37,7 @@ def create_superuser():
 
         _, country_code = get_country_from_mobile(mobile_number)
 
-        country = db.query(Country).filter(
-            Country.country_code == country_code
-        ).first()
+        country = db.query(Country).filter(Country.country_code == country_code).first()
 
         if not country:
             print(f"Country not found for country code {country_code}")

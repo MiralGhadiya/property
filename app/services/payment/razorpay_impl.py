@@ -1,10 +1,10 @@
 # app/services/payment/razorpay_impl.py
 
 import razorpay
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from razorpay.errors import SignatureVerificationError
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
 
 from app.core.config_manager import get_config
 from app.models import SubscriptionPlan, UserSubscription
@@ -31,15 +31,17 @@ class RazorpayProvider(BasePaymentProvider):
         currency: str,
         user_id: str,
         pricing_country: str,
-        ip_country: str | None
+        ip_country: str | None,
     ) -> dict:
         try:
             client = get_razorpay_client()
-            order = client.order.create({
-                "amount": amount,
-                "currency": currency,
-                "payment_capture": 1,
-            })
+            order = client.order.create(
+                {
+                    "amount": amount,
+                    "currency": currency,
+                    "payment_capture": 1,
+                }
+            )
 
             sub = UserSubscription(
                 user_id=user_id,
@@ -72,8 +74,8 @@ class RazorpayProvider(BasePaymentProvider):
                     "razorpay_key": get_config("RAZORPAY_KEY_ID"),
                     "amount": amount,
                     "currency": currency,
-                    "order_id": order["id"]
-                }
+                    "order_id": order["id"],
+                },
             }
 
         except razorpay.errors.BadRequestError:
@@ -91,34 +93,35 @@ class RazorpayProvider(BasePaymentProvider):
             logger.exception("Unexpected error during Razorpay order creation")
             raise HTTPException(500, "Unable to create payment order")
 
-    def verify_payment(
-        self,
-        db: Session,
-        payload: dict,
-        user_id: str
-    ) -> dict:
+    def verify_payment(self, db: Session, payload: dict, user_id: str) -> dict:
         try:
             client = get_razorpay_client()
-            
+
             razorpay_order_id = payload.get("razorpay_order_id")
             razorpay_payment_id = payload.get("razorpay_payment_id")
             razorpay_signature = payload.get("razorpay_signature")
-            
+
             if not all([razorpay_order_id, razorpay_payment_id, razorpay_signature]):
                 raise HTTPException(400, "Missing required Razorpay verification parameters")
 
-            client.utility.verify_payment_signature({
-                "razorpay_order_id": razorpay_order_id,
-                "razorpay_payment_id": razorpay_payment_id,
-                "razorpay_signature": razorpay_signature,
-            })
+            client.utility.verify_payment_signature(
+                {
+                    "razorpay_order_id": razorpay_order_id,
+                    "razorpay_payment_id": razorpay_payment_id,
+                    "razorpay_signature": razorpay_signature,
+                }
+            )
 
-            sub = db.query(UserSubscription).filter(
-                or_(
-                    UserSubscription.provider_order_id == razorpay_order_id,
-                    UserSubscription.razorpay_order_id == razorpay_order_id
+            sub = (
+                db.query(UserSubscription)
+                .filter(
+                    or_(
+                        UserSubscription.provider_order_id == razorpay_order_id,
+                        UserSubscription.razorpay_order_id == razorpay_order_id,
+                    )
                 )
-            ).first()
+                .first()
+            )
 
             if not sub:
                 raise HTTPException(404, "Subscription not found")
@@ -129,14 +132,11 @@ class RazorpayProvider(BasePaymentProvider):
             # Update provider tracking fields as well as legacy fields
             sub.razorpay_payment_id = razorpay_payment_id
             sub.razorpay_signature = razorpay_signature
-            
+
             sub.provider_payment_id = razorpay_payment_id
             sub.provider_signature = razorpay_signature
 
-            return {
-                "subscription": sub,
-                "payment_id": razorpay_payment_id
-            }
+            return {"subscription": sub, "payment_id": razorpay_payment_id}
 
         except SignatureVerificationError:
             raise HTTPException(400, "Invalid payment signature")

@@ -1,14 +1,14 @@
 # app/models/exchange_rate.py
 
-import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, Numeric, DateTime
-from app.database.db import Base
 
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, DateTime, Numeric, String
+
+from app.database.db import Base
 from app.database.mixins import UUIDPrimaryKeyMixin
 
-class ExchangeRate(UUIDPrimaryKeyMixin,Base):
+
+class ExchangeRate(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "exchange_rates"
 
     currency_code = Column(String(3), unique=True, nullable=False)

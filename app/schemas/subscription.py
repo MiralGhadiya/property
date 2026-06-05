@@ -1,8 +1,9 @@
-#app/schemas/subscription.py
+# app/schemas/subscription.py
 
-from uuid import UUID
-from typing import Optional, List
 from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel
 
 

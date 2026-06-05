@@ -1,18 +1,18 @@
 # app/tasks/currency_tasks.py
 
-import os
-import requests
 from datetime import datetime
-from dotenv import load_dotenv
-from celery import shared_task
 
-from app.models import ExchangeRate
-from app.database.db import SessionLocal
+import requests
+from celery import shared_task
+from dotenv import load_dotenv
 
 from app.core.config_manager import get_config
+from app.database.db import SessionLocal
+from app.models import ExchangeRate
 from app.utils.logger_config import app_logger as logger
 
-load_dotenv() 
+load_dotenv()
+
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=60, retry_kwargs={"max_retries": 3})
 def update_exchange_rates(self):
@@ -44,9 +44,7 @@ def update_exchange_rates(self):
 
             currency = pair.replace("USD", "")
 
-            existing = db.query(ExchangeRate).filter(
-                ExchangeRate.currency_code == currency
-            ).first()
+            existing = db.query(ExchangeRate).filter(ExchangeRate.currency_code == currency).first()
 
             if existing:
                 existing.rate_to_usd = rate
@@ -59,10 +57,10 @@ def update_exchange_rates(self):
                         updated_at=datetime.utcnow(),
                     )
                 )
-                
+
         db.commit()
         logger.info("Stored %s exchange rates", len(quotes))
-        
+
     except Exception:
         db.rollback()
         logger.exception("Error updating exchange rates")

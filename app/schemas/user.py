@@ -1,7 +1,8 @@
-#app/schemas/user.py
+# app/schemas/user.py
 
-from uuid import UUID
 from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel, EmailStr
 
 
@@ -31,7 +32,7 @@ class UserProfile(BaseModel):
     mobile_number: str
     country: Optional[str]
     role: str
-    
+
     subscription_id: Optional[UUID] = None
     plan_name: Optional[str] = None
     has_active_subscription: bool

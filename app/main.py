@@ -1,30 +1,30 @@
 import time
 
 from fastapi import FastAPI, Request
-from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 
+import app.celery_app as celery_app
 from app.core.config_manager import load_config, start_listener_thread
-from app.routes import auth as user_auth, valuation, subscription, payment, user_feedback, inquiry, unified_payment
+from app.middleware.ip_country import get_client_ip
+from app.middleware.ip_country_middleware import IPCountryMiddleware
+from app.routes import auth as user_auth
+from app.routes import inquiry, payment, subscription, unified_payment, user_feedback, valuation
 from app.routes.admin import (
     auth,
-    users,
-    subscription_plans,
-    user_subscriptions,
-    valuations,
+    country,
     dashboard,
     feedback,
-    staff,
     inquiries,
-    country,
+    staff,
+    subscription_plans,
     system_config,
+    user_subscriptions,
+    users,
+    valuations,
 )
-
-import app.celery_app
-from app.middleware.ip_country_middleware import IPCountryMiddleware
-from app.middleware.ip_country import get_client_ip
-from app.utils.logger_config import app_logger as logger, shutdown_logging
-
+from app.utils.logger_config import app_logger as logger
+from app.utils.logger_config import shutdown_logging
 
 logger.info("Starting Desktop Valuation API")
 
@@ -35,11 +35,12 @@ app = FastAPI(title="Desktop Valuation API")
 def healthcheck():
     return {"status": "ok"}
 
+
 @app.on_event("startup")
 def startup_event():
     logger.info("Loading system configuration from database...")
     load_config()
-    # auto_reload(10) 
+    # auto_reload(10)
     start_listener_thread()
     logger.info("System configuration loaded")
 
@@ -55,6 +56,7 @@ async def add_ngrok_header(request: Request, call_next):
     response: Response = await call_next(request)
     response.headers["ngrok-skip-browser-warning"] = "true"
     return response
+
 
 # ✅ ADD CORS HERE (top)
 app.add_middleware(
@@ -109,6 +111,7 @@ app.include_router(system_config.router)
 # --------------------------------------------------
 # IP → Country middleware
 # --------------------------------------------------
+
 
 @app.middleware("http")
 async def log_ip_country_resolution(request: Request, call_next):

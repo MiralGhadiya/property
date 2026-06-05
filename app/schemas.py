@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Optional, List, Literal
+from typing import List, Literal, Optional
+
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -26,7 +27,8 @@ class UserCreate(BaseModel):
     username: str
     mobile_number: str
     password: str
-    
+
+
 class LogoutRequest(BaseModel):
     refresh_token: str
 
@@ -42,7 +44,7 @@ class TokenResponse(BaseModel):
 
 class ResendVerificationRequest(BaseModel):
     email: EmailStr
-    
+
 
 class AppleLogin(BaseModel):
     id_token: str
@@ -60,14 +62,14 @@ class UserProfile(BaseModel):
 
     class Config:
         from_attributes = True
-        
-        
+
+
 class UserUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     mobile_number: Optional[str] = None
-        
-        
+
+
 class ForgotPassword(BaseModel):
     email: EmailStr
 
@@ -76,14 +78,14 @@ class ChangePassword(BaseModel):
     old_password: str
     new_password: str
     confirm_password: str
-    
-    
+
+
 class ResetPassword(BaseModel):
     token: str
     new_password: str
     confirm_password: str
-    
-    
+
+
 class AdminLogin(BaseModel):
     email: EmailStr
     password: str
@@ -93,8 +95,8 @@ class AdminProfile(BaseModel):
     id: int
     email: EmailStr
     username: str
-    
-    
+
+
 class AdminUserResponse(BaseModel):
     id: int
     email: Optional[EmailStr]
@@ -111,8 +113,8 @@ class AdminUserResponse(BaseModel):
 class AdminResetPassword(BaseModel):
     new_password: str
     confirm_password: str
-    
-    
+
+
 class SubscriptionPlanCreate(BaseModel):
     name: str
     country_code: str
@@ -142,8 +144,8 @@ class SubscriptionPlanResponse(BaseModel):
 
     class Config:
         from_attributes = True
-        
-        
+
+
 class AssignSubscription(BaseModel):
     plan_id: int
     duration_days: int = 30
@@ -169,8 +171,8 @@ class UserSubscriptionResponse(BaseModel):
 
     class Config:
         from_attributes = True
-        
-        
+
+
 class ValuationResponse(BaseModel):
     id: int
     valuation_id: str
@@ -188,7 +190,7 @@ class ValuationDetailResponse(ValuationResponse):
     user_fields: dict
     ai_response: dict
     report_context: dict
-    
+
 
 class FeedbackCreate(BaseModel):
     type: Literal["GENERAL", "VALUATION", "PAYMENT", "SUBSCRIPTION"]
@@ -197,7 +199,7 @@ class FeedbackCreate(BaseModel):
     rating: Optional[int] = Field(None, ge=1, le=5)
     valuation_id: Optional[str] = None
     subscription_id: Optional[int] = None
-    
+
 
 class FeedbackResponse(BaseModel):
     id: int
@@ -215,6 +217,7 @@ class FeedbackResponse(BaseModel):
 class FeedbackMessageCreate(BaseModel):
     message: str
 
+
 class FeedbackMessageResponse(BaseModel):
     id: int
     sender: str
@@ -223,12 +226,10 @@ class FeedbackMessageResponse(BaseModel):
 
     class Config:
         from_attributes = True
-       
-        
+
+
 class AdminFeedbackAction(BaseModel):
-    status: Optional[
-        Literal["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]
-    ] = None
+    status: Optional[Literal["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]] = None
 
     reply: Optional[str] = None
     notify_user: bool = False

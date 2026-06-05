@@ -1,15 +1,17 @@
-from pydantic import BaseModel, EmailStr
-from uuid import UUID
 from typing import Dict, Optional
+from uuid import UUID
+
+from pydantic import BaseModel, EmailStr
+
 
 class StaffBase(BaseModel):
-    name: str  
-    email: str  
-    phone: str 
-    password: str 
-    role: str 
-    
-    
+    name: str
+    email: str
+    phone: str
+    password: str
+    role: str
+
+
 class StaffLogin(BaseModel):
     email: EmailStr
     password: str

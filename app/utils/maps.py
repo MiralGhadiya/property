@@ -1,24 +1,23 @@
 # app/utils/maps.py
 
 import base64
-import os
 import random
+
 import requests
 
 from app.core.config_manager import get_config
 from app.utils.logger_config import app_logger as logger
 
+
 # GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 def get_maps_key():
     return get_config("GOOGLE_MAPS_API_KEY")
 
+
 def geocode_address(address: str):
     url = "https://maps.googleapis.com/maps/api/geocode/json"
 
-    params = {
-        "address": address,
-        "key": get_maps_key()
-    }
+    params = {"address": address, "key": get_maps_key()}
 
     r = requests.get(url, params=params, timeout=10)
     data = r.json()
@@ -34,7 +33,7 @@ def geocode_address(address: str):
 
     for component in result["address_components"]:
         if "country" in component["types"]:
-            country_code = component["short_name"]   # US, AE, IN
+            country_code = component["short_name"]  # US, AE, IN
             country_name = component["long_name"]
 
     return {
@@ -43,19 +42,14 @@ def geocode_address(address: str):
         "formatted_address": result["formatted_address"],
         "location_type": result["geometry"]["location_type"],
         "country_code": country_code,
-        "country_name": country_name
+        "country_name": country_name,
     }
-    
+
 
 def find_place(address: str):
     url = "https://maps.googleapis.com/maps/api/place/findplacefromtext/json"
 
-    params = {
-        "input": address,
-        "inputtype": "textquery",
-        "fields": "place_id,photos",
-        "key": get_maps_key()
-    }
+    params = {"input": address, "inputtype": "textquery", "fields": "place_id,photos", "key": get_maps_key()}
 
     r = requests.get(url, params=params, timeout=10)
     data = r.json()
@@ -80,7 +74,7 @@ def get_place_photo(address: str):
 
     photo = random.choice(photos)
     logger.info(f"Selected photo reference: {photo['photo_reference']} for address: {address}")
-    
+
     ref = photo["photo_reference"]
     logger.info(f"Fetching photo for reference: {ref}")
 
@@ -100,18 +94,12 @@ def get_place_photo(address: str):
     image_base64 = base64.b64encode(r.content).decode()
 
     return f"data:image/jpeg;base64,{image_base64}"
-        
-    
+
+
 def get_streetview_metadata(lat, lng):
     url = "https://maps.googleapis.com/maps/api/streetview/metadata"
 
-    params = {
-        "location": f"{lat},{lng}",
-        "radius": 200,
-        "source": "outdoor",
-        "key": get_maps_key()
-    }
-    
+    params = {"location": f"{lat},{lng}", "radius": 200, "source": "outdoor", "key": get_maps_key()}
 
     r = requests.get(url, params=params, timeout=10)
     data = r.json()
@@ -160,5 +148,5 @@ def build_static_maps(lat, lng, address=None):
         "roadmap": f"{base}?{common_params(16)}&maptype=roadmap",
         "hybrid": f"{base}?{common_params(16)}&maptype=hybrid",
         "terrain": f"{base}?{common_params(19)}&maptype=terrain",
-        "location_image": photo_or_street
+        "location_image": photo_or_street,
     }

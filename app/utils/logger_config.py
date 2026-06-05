@@ -12,6 +12,7 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
 except ImportError:  # pragma: no cover - dependency is present in normal installs
+
     def load_dotenv(*args, **kwargs):
         return False
 
@@ -182,7 +183,7 @@ class DailyFileHandler(logging.Handler):
         except OSError:
             return
 
-        for log_file in log_files[self.backup_count:]:
+        for log_file in log_files[self.backup_count :]:
             try:
                 log_file.unlink()
             except OSError:

@@ -1,18 +1,16 @@
 from uuid import UUID
-from sqlalchemy.orm import Session
+
 from fastapi import APIRouter, Depends, HTTPException
-
-from app.models.user import User
-from app.models.staff import Staff
-
-from app.schemas.staff import StaffCreate, StaffResponse, StaffUpdate
+from sqlalchemy.orm import Session
 
 from app.auth import hash_password
 from app.common import PaginatedResponse
-
 from app.database.db import get_db
-from app.utils.response import APIResponse, success_response
 from app.deps import pagination_params, require_management
+from app.models.staff import Staff
+from app.models.user import User
+from app.schemas.staff import StaffCreate, StaffResponse, StaffUpdate
+from app.utils.response import APIResponse, success_response
 
 router = APIRouter(prefix="/admin/staff", tags=["admin-staff"])
 
@@ -29,11 +27,7 @@ def build_accesses(staff: Staff) -> dict:
 
 
 @router.post("/", response_model=APIResponse[StaffResponse])
-def create_staff(
-    staff: StaffCreate, 
-    db: Session = Depends(get_db),
-    admin_user: User = Depends(require_management)
-):
+def create_staff(staff: StaffCreate, db: Session = Depends(get_db), admin_user: User = Depends(require_management)):
 
     existing_staff = db.query(Staff).filter(Staff.email == staff.email).first()
     if existing_staff:
@@ -48,15 +42,15 @@ def create_staff(
         name=staff.name,
         email=staff.email,
         phone=staff.phone,
-        password=hashed_password, 
+        password=hashed_password,
         role=staff.role,
-        user_id=admin_user.id, 
+        user_id=admin_user.id,
         can_access_user=staff.can_access_user,
         can_access_staff=staff.can_access_staff,
         can_access_dashboard=staff.can_access_dashboard,
         can_access_reports=staff.can_access_reports,
         can_access_subscriptions_plans=staff.can_access_subscriptions_plans,
-        can_access_config=staff.can_access_config,   
+        can_access_config=staff.can_access_config,
     )
 
     db.add(new_staff)
@@ -64,15 +58,15 @@ def create_staff(
     db.refresh(new_staff)
 
     return success_response(
-        data = StaffResponse(
+        data=StaffResponse(
             id=new_staff.id,
             name=new_staff.name,
             email=new_staff.email,
             phone=new_staff.phone,
             role=new_staff.role,
             accesses=build_accesses(new_staff),
-    ),
-        message="Staff member created successfully"
+        ),
+        message="Staff member created successfully",
     )
 
 
@@ -81,9 +75,8 @@ def list_staff(
     db: Session = Depends(get_db),
     admin_user: User = Depends(require_management),
     params: dict = Depends(pagination_params),
-    
 ):
-    
+
     query = db.query(Staff)
 
     if params["limit"] is not None:
@@ -92,9 +85,9 @@ def list_staff(
         staff_members = query.all()
 
     total = db.query(Staff).count()
-    
+
     data = [
-    StaffResponse(
+        StaffResponse(
             id=s.id,
             name=s.name,
             email=s.email,
@@ -112,9 +105,9 @@ def list_staff(
                 "page": params["page"],
                 "limit": params["limit"],
                 "total": total,
-            }
-    },
-        message="Staff list fetched successfully"
+            },
+        },
+        message="Staff list fetched successfully",
     )
 
 
@@ -124,7 +117,7 @@ def get_staff(
     db: Session = Depends(get_db),
     _: User = Depends(require_management),
 ):
-    
+
     staff_member = db.query(Staff).filter(Staff.id == staff_id).first()
 
     if not staff_member:
@@ -137,16 +130,16 @@ def get_staff(
             email=staff_member.email,
             phone=staff_member.phone,
             role=staff_member.role,
-        accesses=build_accesses(staff_member),
-    ),
-        message="Staff member fetched successfully"
+            accesses=build_accesses(staff_member),
+        ),
+        message="Staff member fetched successfully",
     )
 
 
 @router.patch("/{staff_id}", response_model=APIResponse[StaffResponse])
 def update_staff(
     staff_id: UUID,
-    staff_update: StaffUpdate, 
+    staff_update: StaffUpdate,
     db: Session = Depends(get_db),
     _: User = Depends(require_management),
 ):
@@ -164,7 +157,7 @@ def update_staff(
     if staff_update.role is not None:
         staff_member.role = staff_update.role
     if staff_update.password is not None:
-        staff_member.password = staff_update.password  
+        staff_member.password = staff_update.password
     if staff_update.can_access_user is not None:
         staff_member.can_access_user = staff_update.can_access_user
     if staff_update.can_access_staff is not None:
@@ -190,10 +183,10 @@ def update_staff(
             role=staff_member.role,
             accesses=build_accesses(staff_member),
         ),
-        message="Staff updated successfully"
+        message="Staff updated successfully",
     )
-    
-    
+
+
 @router.delete("/{staff_id}", response_model=APIResponse[dict])
 def delete_staff(
     staff_id: UUID,
@@ -208,7 +201,4 @@ def delete_staff(
     db.delete(staff_member)
     db.commit()
 
-    return success_response(
-        message="Staff member deleted successfully",
-        data={"id": str(staff_id)}
-    )
+    return success_response(message="Staff member deleted successfully", data={"id": str(staff_id)})

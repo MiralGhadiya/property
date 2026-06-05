@@ -1,25 +1,18 @@
 # app/router/admin/system_config.py
 
-from uuid import UUID
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.deps import get_db, require_management
-from app.models.system_config import SystemConfig
-from app.schemas.admin import (
-    SystemConfigCreate,
-    SystemConfigUpdate,
-    SystemConfigResponse,
-)
-                 
-from app.utils.response import APIResponse, success_response
 from app.common import PaginatedResponse
-from app.deps import pagination_params
 from app.core.config_manager import notify_config_update
-
+from app.deps import get_db, pagination_params, require_management
+from app.models.system_config import SystemConfig
+from app.schemas.admin import SystemConfigCreate, SystemConfigResponse, SystemConfigUpdate
 from app.utils.logger_config import app_logger as logger
+from app.utils.response import APIResponse, success_response
 
 router = APIRouter(
     prefix="/admin/system-config",
@@ -33,11 +26,7 @@ def create_config(
     db: Session = Depends(get_db),
     admin_user=Depends(require_management),
 ):
-    existing = (
-        db.query(SystemConfig)
-        .filter(SystemConfig.config_key == payload.config_key)
-        .first()
-    )
+    existing = db.query(SystemConfig).filter(SystemConfig.config_key == payload.config_key).first()
 
     if existing:
         raise HTTPException(400, "Config key already exists")
@@ -49,13 +38,10 @@ def create_config(
     db.refresh(config)
 
     logger.info(f"Config created: {config.config_key}")
-    
-    notify_config_update()  
 
-    return success_response(
-        data=config,
-        message="Config created successfully"
-    )
+    notify_config_update()
+
+    return success_response(data=config, message="Config created successfully")
 
 
 @router.get("", response_model=APIResponse[PaginatedResponse[SystemConfigResponse]])
@@ -75,7 +61,7 @@ def list_configs(
     query = query.order_by(SystemConfig.config_key.asc())
     if params["limit"] is not None:
         query = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"])
-    
+
     configs = query.all()
 
     return success_response(
@@ -97,8 +83,8 @@ def list_configs(
         },
         message="Configs fetched successfully",
     )
-        
-    
+
+
 @router.get("/{config_id}", response_model=APIResponse[SystemConfigResponse])
 def get_config(
     config_id: UUID,
@@ -110,10 +96,7 @@ def get_config(
     if not config:
         raise HTTPException(404, "Config not found")
 
-    return success_response(
-        data=config,
-        message="Config fetched successfully"
-    )
+    return success_response(data=config, message="Config fetched successfully")
 
 
 @router.put("/{config_id}", response_model=APIResponse[SystemConfigResponse])
@@ -135,13 +118,10 @@ def update_config(
     db.refresh(config)
 
     logger.info(f"Config updated: {config.config_key}")
-    
+
     notify_config_update()
 
-    return success_response(
-        data=config,
-        message="Config updated successfully"
-    )
+    return success_response(data=config, message="Config updated successfully")
 
 
 @router.delete("/{config_id}", response_model=APIResponse[bool])
@@ -159,10 +139,7 @@ def delete_config(
     db.commit()
 
     logger.info(f"Config deleted: {config.config_key}")
-    
+
     notify_config_update()
 
-    return success_response(
-        data=True,
-        message="Config deleted successfully"
-    )
+    return success_response(data=True, message="Config deleted successfully")

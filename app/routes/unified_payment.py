@@ -1,17 +1,17 @@
 # app/routes/unified_payment.py
 
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import UUID
-from datetime import datetime, timezone
+
 from dateutil.relativedelta import relativedelta
-from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.deps import get_db, get_current_user
-from app.models import SubscriptionPlan, UserSubscription, User
+from app.deps import get_current_user, get_db
+from app.models import SubscriptionPlan, User, UserSubscription
 from app.models.subscription_settings import SubscriptionSettings
 from app.services.exchange_rate_service import get_rate
 from app.services.payment.factory import PaymentProviderFactory
@@ -35,7 +35,6 @@ class UnifiedVerifyPaymentRequest(BaseModel):
     payoneer_intent_id: Optional[str] = Field(None, description="Payoneer checkout intent ID")
 
 
-
 def _pricing_country(request: Request, current_user: User) -> str:
     ip_country = getattr(request.state, "ip_country", None)
     user_country = current_user.country.country_code
@@ -53,13 +52,10 @@ def create_unified_order(
     if body.provider.upper() == "PAYONEER":
         raise HTTPException(
             status_code=400,
-            detail="Payoneer is currently unavailable. Please use Razorpay or PayPal instead to complete your transaction."
+            detail="Payoneer is currently unavailable. Please use Razorpay or PayPal instead to complete your transaction.",
         )
 
-    plan = db.query(SubscriptionPlan).filter(
-        SubscriptionPlan.id == plan_id,
-        SubscriptionPlan.is_active == True
-    ).first()
+    plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.id == plan_id, SubscriptionPlan.is_active == True).first()
 
     if not plan:
         raise HTTPException(404, "Plan not found")
@@ -80,13 +76,18 @@ def create_unified_order(
         currency = plan.currency
 
     # Clean up stale pending orders
-    existing_pending = db.query(UserSubscription).filter(
-        UserSubscription.user_id == current_user.id,
-        UserSubscription.plan_id == plan.id,
-        UserSubscription.payment_provider == body.provider.upper(),
-        UserSubscription.payment_status.in_(["CREATED", "PENDING"]),
-        UserSubscription.is_active == False
-    ).order_by(UserSubscription.id.desc()).first()
+    existing_pending = (
+        db.query(UserSubscription)
+        .filter(
+            UserSubscription.user_id == current_user.id,
+            UserSubscription.plan_id == plan.id,
+            UserSubscription.payment_provider == body.provider.upper(),
+            UserSubscription.payment_status.in_(["CREATED", "PENDING"]),
+            UserSubscription.is_active == False,
+        )
+        .order_by(UserSubscription.id.desc())
+        .first()
+    )
 
     if existing_pending:
         logger.info(
@@ -122,9 +123,6 @@ def create_unified_order(
         raise HTTPException(500, f"Unified payment failed: {str(e)}")
 
 
-
-
-
 @router.post("/verify")
 def verify_unified_payment(
     body: UnifiedVerifyPaymentRequest,
@@ -134,7 +132,7 @@ def verify_unified_payment(
     if body.provider.upper() == "PAYONEER":
         raise HTTPException(
             status_code=400,
-            detail="Payoneer is currently unavailable. Please use Razorpay or PayPal instead to complete your transaction."
+            detail="Payoneer is currently unavailable. Please use Razorpay or PayPal instead to complete your transaction.",
         )
 
     try:
@@ -159,19 +157,12 @@ def verify_unified_payment(
 
         # Resolve polymorphic provider subclass and verify
         provider = PaymentProviderFactory.get_provider(body.provider)
-        result = provider.verify_payment(
-            db=db,
-            payload=target_payload,
-            user_id=current_user.id
-        )
+        result = provider.verify_payment(db=db, payload=target_payload, user_id=current_user.id)
 
         sub = result["subscription"]
 
         if sub.payment_status == "PAID" and sub.is_active:
-            return {
-                "message": "Already activated",
-                "subscription_id": str(sub.id)
-            }
+            return {"message": "Already activated", "subscription_id": str(sub.id)}
 
         # Activate subscription
         now = datetime.now(timezone.utc)
@@ -201,7 +192,7 @@ def verify_unified_payment(
         return {
             "message": "Payment successful & subscription activated",
             "subscription_id": str(sub.id),
-            "payment_id": result["payment_id"]
+            "payment_id": result["payment_id"],
         }
 
     except ValueError as e:
@@ -344,5 +335,3 @@ def payment_callback(status: str):
         </body>
     </html>
     """
-
-

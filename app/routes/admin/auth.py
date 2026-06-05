@@ -1,25 +1,19 @@
-#app/routes/admin/auth.py
+# app/routes/admin/auth.py
 
 from typing import Union
-from sqlalchemy.orm import Session
+
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
-from app.models import User, Staff
+from app.auth import create_access_token, hash_password, verify_password
+from app.deps import get_db, require_management
+from app.models import Staff, User
+from app.schemas import AdminLogin, ChangePassword
 from app.services import auth_service
-from app.schemas import AdminLogin, AdminProfile, ChangePassword
-from app.schemas.management import ManagementProfile
-
-from app.deps import get_db, require_management, require_superuser
-from app.utils.response import APIResponse, success_response
-from app.auth import verify_password, create_access_token, hash_password
-
 from app.utils.logger_config import app_logger as logger
+from app.utils.response import success_response
 
-
-router = APIRouter(
-    prefix="/admin",
-    tags=["admin-auth"]
-)
+router = APIRouter(prefix="/admin", tags=["admin-auth"])
 
 
 # @router.post(
@@ -63,12 +57,9 @@ def management_login(
     data: AdminLogin,
     db: Session = Depends(get_db),
 ):
-    
+
     # 1️⃣ Check Admin (superuser)
-    admin = db.query(User).filter(
-        User.email == data.email,
-        User.is_superuser == True
-    ).first()
+    admin = db.query(User).filter(User.email == data.email, User.is_superuser == True).first()
 
     if admin:
         if not verify_password(data.password, admin.hashed_password):
@@ -77,9 +68,7 @@ def management_login(
         if not admin.is_active:
             raise HTTPException(status_code=403, detail="Admin account disabled")
 
-        access_token = create_access_token(
-            {"sub": str(admin.id), "role": "admin"}
-        )
+        access_token = create_access_token({"sub": str(admin.id), "role": "admin"})
 
         return success_response(
             data={
@@ -90,22 +79,18 @@ def management_login(
                     "id": admin.id,
                     "email": admin.email,
                     "username": admin.username,
-                }
+                },
             },
-            message="Admin login successful"
+            message="Admin login successful",
         )
 
-    staff = db.query(Staff).filter(
-        Staff.email == data.email
-    ).first()
+    staff = db.query(Staff).filter(Staff.email == data.email).first()
 
     if staff:
         if not verify_password(data.password, staff.password):
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        access_token = create_access_token(
-            {"sub": str(staff.id), "role": "staff"}
-        )
+        access_token = create_access_token({"sub": str(staff.id), "role": "staff"})
 
         return success_response(
             data={
@@ -124,14 +109,14 @@ def management_login(
                         "can_access_reports": staff.can_access_reports,
                         "can_access_subscriptions_plans": staff.can_access_subscriptions_plans,
                         "can_access_config": staff.can_access_config,
-                    }
-                }
+                    },
+                },
             },
-            message="Staff login successful"
+            message="Staff login successful",
         )
 
     raise HTTPException(status_code=403, detail="Access denied")
-    
+
 
 @router.get("/management/me")
 def management_me(
@@ -147,7 +132,7 @@ def management_me(
                 "email": current.email,
                 "username": current.username,
             },
-            message="Admin profile fetched successfully"
+            message="Admin profile fetched successfully",
         )
 
     if isinstance(current, Staff):
@@ -166,9 +151,9 @@ def management_me(
                     "can_access_reports": current.can_access_reports,
                     "can_access_subscriptions_plans": current.can_access_subscriptions_plans,
                     "can_access_config": current.can_access_config,
-                }
+                },
             },
-            message="Staff profile fetched successfully"
+            message="Staff profile fetched successfully",
         )
 
 
@@ -187,14 +172,11 @@ def admin_logout(
 ):
     try:
         auth_service.revoke_all_refresh_tokens(db, current_admin.id)
-    except Exception as e:
+    except Exception:
         logger.exception("Admin logout failed")
         raise HTTPException(500, "Logout failed")
 
-    return success_response(
-        data=None,
-        message="Admin logged out successfully"
-    )
+    return success_response(data=None, message="Admin logged out successfully")
 
 
 @router.post("/change-password")
@@ -204,37 +186,22 @@ def admin_change_password(
     db: Session = Depends(get_db),
 ):
     logger.info(f"Admin password change attempt user_id={current_admin.id}")
-    
+
     if data.new_password != data.confirm_password:
         logger.warning(f"Admin password mismatch user_id={current_admin.id}")
-        raise HTTPException(
-            status_code=400,
-            detail="Passwords do not match"
-        )
+        raise HTTPException(status_code=400, detail="Passwords do not match")
 
-    if not verify_password(
-        data.old_password,
-        current_admin.hashed_password
-    ):
+    if not verify_password(data.old_password, current_admin.hashed_password):
         logger.warning(f"Admin old password incorrect user_id={current_admin.id}")
-        raise HTTPException(
-            status_code=401,
-            detail="Old password is incorrect"
-        )
+        raise HTTPException(status_code=401, detail="Old password is incorrect")
 
     try:
         current_admin.hashed_password = hash_password(data.new_password)
         db.commit()
     except Exception as e:
         logger.error(f"Error changing admin password user_id={current_admin.id} error={str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail="Error changing password"
-        )
-        
+        raise HTTPException(status_code=500, detail="Error changing password")
+
     logger.info(f"Admin password changed user_id={current_admin.id}")
 
-    return success_response(
-        data=None,
-        message="Password changed successfully"
-    )
+    return success_response(data=None, message="Password changed successfully")

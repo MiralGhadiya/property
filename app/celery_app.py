@@ -1,10 +1,8 @@
 # app/celery_app.py
 
-import os
-from dotenv import load_dotenv
 from celery import Celery
 from celery.schedules import crontab
-from app.core.config_manager import get_config
+from dotenv import load_dotenv
 
 from app.core.config_manager import load_config
 
@@ -14,7 +12,7 @@ load_dotenv()
 
 from app.core.redis_client import REDIS_URL
 
-celery_app = Celery(    
+celery_app = Celery(
     "app",
     broker=REDIS_URL,
     backend=REDIS_URL,

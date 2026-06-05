@@ -1,8 +1,10 @@
-#app/llm/gemini.py
+# app/llm/gemini.py
 
-import os
 import json
+import os
+
 import google.generativeai as genai
+
 from app.utils.logger_config import app_logger as logger
 
 logger.info("Initializing Gemini client")
@@ -84,7 +86,7 @@ def generate_valuation_summary(form_data: dict):
 
         except json.JSONDecodeError:
             logger.warning("Invalid JSON received, attempting cleanup")
-            cleaned = raw[raw.find("{"): raw.rfind("}") + 1]
+            cleaned = raw[raw.find("{") : raw.rfind("}") + 1]
             parsed = json.loads(cleaned)
             logger.info("Gemini response cleaned and parsed successfully")
             return parsed

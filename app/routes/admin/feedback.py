@@ -1,39 +1,29 @@
-#app/routes/admin/feedback.py
+# app/routes/admin/feedback.py
 
-from uuid import UUID
-from sqlalchemy import or_
 from typing import Optional
-from sqlalchemy.orm import Session, load_only
-from fastapi import APIRouter, Depends, Query, HTTPException
+from uuid import UUID
 
-from app.models.feedback import Feedback
-from app.models.feedback_message import FeedbackMessage
-from app.schemas import FeedbackResponse, AdminFeedbackAction
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, load_only
 
 from app.common import PaginatedResponse
-
+from app.deps import get_db, pagination_params, require_management
+from app.models.feedback import Feedback
+from app.models.feedback_message import FeedbackMessage
+from app.schemas import AdminFeedbackAction, FeedbackResponse
 from app.utils.email import send_feedback_reply_email
+from app.utils.logger_config import app_logger as logger
 from app.utils.response import APIResponse, success_response
 
-from app.deps import get_db, pagination_params, require_management
-
-from app.utils.logger_config import app_logger as logger
+router = APIRouter(prefix="/admin/feedback", tags=["admin-feedback"])
 
 
-router = APIRouter(
-    prefix="/admin/feedback",
-    tags=["admin-feedback"]
-)
-
-
-@router.get("",
-            response_model=APIResponse[PaginatedResponse[FeedbackResponse]]
-        )
+@router.get("", response_model=APIResponse[PaginatedResponse[FeedbackResponse]])
 def list_feedback(
     db: Session = Depends(get_db),
     _: None = Depends(require_management),
     params: dict = Depends(pagination_params),
-
     user_id: Optional[UUID] = Query(None),
     status: Optional[str] = Query(None),
     type: Optional[str] = Query(None),
@@ -41,10 +31,7 @@ def list_feedback(
     valuation_id: Optional[str] = Query(None),
     subscription_id: Optional[UUID] = Query(None),
 ):
-    logger.info(
-        "Admin listing feedback "
-        f"page={params['page']} status={status} type={type}"
-    )
+    logger.info("Admin listing feedback " f"page={params['page']} status={status} type={type}")
 
     query = db.query(Feedback).options(
         load_only(
@@ -60,10 +47,10 @@ def list_feedback(
             Feedback.subscription_id,
         )
     )
-    
+
     if user_id:
         query = query.filter(Feedback.user_id == user_id)
-        
+
     if params["search"]:
         search = f"%{params['search']}%"
         query = query.filter(
@@ -79,7 +66,7 @@ def list_feedback(
 
     if type:
         query = query.filter(Feedback.type == type)
-        
+
     if rating:
         query = query.filter(Feedback.rating == rating)
 
@@ -94,8 +81,7 @@ def list_feedback(
     # apply pagination safely
     if params["limit"] is not None:
         feedbacks = (
-            query
-            .order_by(Feedback.created_at.desc())
+            query.order_by(Feedback.created_at.desc())
             .offset((params["page"] - 1) * params["limit"])
             .limit(params["limit"])
             .all()
@@ -103,20 +89,18 @@ def list_feedback(
     else:
         feedbacks = query.order_by(Feedback.created_at.desc()).all()
 
-    logger.debug(
-        f"Admin fetched feedback count={len(feedbacks)} total={total}"
-    )
+    logger.debug(f"Admin fetched feedback count={len(feedbacks)} total={total}")
 
     return success_response(
         data={
-        "data": feedbacks,
-        "pagination": {
-            "page": params["page"],
-            "limit": params["limit"],
-            "total": total,
+            "data": feedbacks,
+            "pagination": {
+                "page": params["page"],
+                "limit": params["limit"],
+                "total": total,
+            },
         },
-    },
-        message="Feedback list fetched successfully"
+        message="Feedback list fetched successfully",
     )
 
 
@@ -165,7 +149,7 @@ def admin_feedback_action(
         data={
             "email_sent": did_reply and data.notify_user,
         },
-        message="Feedback updated successfully"
+        message="Feedback updated successfully",
     )
 
 

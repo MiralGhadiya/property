@@ -212,13 +212,28 @@ Check container status:
 docker compose ps
 ```
 
-Check logs:
+Check Docker service logs:
 
 ```bash
 docker compose logs -f api
 docker compose logs -f celery_worker
 docker compose logs -f celery_beat
+docker compose logs -f postgres
+docker compose logs -f redis
+# If nginx is enabled in docker-compose.yml:
 docker compose logs -f nginx
+```
+
+Check the application file logs saved by the API container:
+
+```bash
+docker compose exec api sh -lc 'ls -lh /app/app/logs && tail -n 100 /app/app/logs/app-$(date +%F).log'
+```
+
+Application file logs are stored in the Docker volume `property_app_logs_data`, mounted at `/app/app/logs` inside the API container. To inspect the volume:
+
+```bash
+docker volume inspect property_app_logs_data
 ```
 
 ## 10. Automatic Bootstrap
@@ -305,10 +320,16 @@ View running services:
 docker compose ps
 ```
 
-View logs:
+View Docker service logs:
 
 ```bash
 docker compose logs -f api
+```
+
+View today's persisted application log:
+
+```bash
+docker compose exec api sh -lc 'ls -lh /app/app/logs && tail -n 100 /app/app/logs/app-$(date +%F).log'
 ```
 
 Open a shell inside the API container:

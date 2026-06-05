@@ -1,20 +1,16 @@
-#app/utils/email.py
+# app/utils/email.py
 
-import os
 import smtplib
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.application import MIMEApplication
-
-from app.core.config_manager import get_config
-
+from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from app.core.config_manager import get_config
 from app.utils.logger_config import app_logger as logger
-
-from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -27,20 +23,25 @@ load_dotenv()
 def get_email_user():
     return get_config("EMAIL_USER")
 
+
 def get_email_password():
     return get_config("EMAIL_PASSWORD")
+
 
 def get_frontend_url():
     return get_config("FRONTEND_URL", "https://desktopvaluation.in")
 
+
 def get_admin_feedback_emails():
     return get_config("ADMIN_FEEDBACK_EMAILS", "").split(",")
+
+
 SMTP_URL = "smtp.gmail.com"
 
 # if not get_email_user() or not get_email_password():
 #     logger.error("EMAIL_USER or EMAIL_PASSWORD not configured")
-    
-    
+
+
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates" / "emails"
 
 _jinja_env = Environment(
@@ -52,7 +53,6 @@ _jinja_env = Environment(
 def _render(template_name: str, **ctx) -> str:
     """Render a Jinja2 email template with the given context."""
     return _jinja_env.get_template(template_name).render(**ctx)
-
 
 
 def send_reset_email(to_email: str, link: str):
@@ -110,7 +110,7 @@ If you didn't request this, ignore this email.
     except Exception:
         logger.exception("Failed to send reset email")
         raise
-        
+
 
 # def send_verification_email(to_email: str, link: str):
 #     logger.info(f"Sending verification email to={to_email}")
@@ -124,9 +124,9 @@ If you didn't request this, ignore this email.
 #         with smtplib.SMTP_SSL(SMTP_URL, 465) as server:
 #             server.login(EMAIL_USER, EMAIL_PASSWORD)
 #             server.send_message(msg)
-            
+
 #         logger.info(f"Verification email sent to={to_email}")
-        
+
 #     except Exception:
 #         logger.exception(f"Failed to send verification email to={to_email}")
 #         raise
@@ -215,7 +215,7 @@ def send_pdf_email(
         part.add_header(
             "Content-Disposition",
             "attachment",
-            filename=filename,  
+            filename=filename,
         )
         msg.attach(part)
 
@@ -230,7 +230,7 @@ def send_pdf_email(
     except Exception:
         logger.exception(f"Failed to send PDF email to={to_email}")
         raise
-    
+
 
 def send_subscription_expiry_email(to_email: str, plan_name: str, expiry_date):
     logger.info(f"Sending subscription expiry reminder to={to_email}")
@@ -263,9 +263,7 @@ def send_subscription_expiry_email(to_email: str, plan_name: str, expiry_date):
 
 
 def send_admin_feedback_email(feedback, user):
-    logger.info(
-        f"Sending admin feedback email feedback_id={feedback.id}"
-    )
+    logger.info(f"Sending admin feedback email feedback_id={feedback.id}")
 
     try:
         body = f"""
@@ -294,20 +292,14 @@ def send_admin_feedback_email(feedback, user):
             server.login(get_email_user(), get_email_password())
             server.send_message(msg)
 
-        logger.info(
-            f"Admin feedback email sent feedback_id={feedback.id}"
-        )
+        logger.info(f"Admin feedback email sent feedback_id={feedback.id}")
 
     except Exception:
-        logger.exception(
-            f"Failed sending admin feedback email feedback_id={feedback.id}"
-        )
-        
+        logger.exception(f"Failed sending admin feedback email feedback_id={feedback.id}")
+
 
 def send_feedback_reply_email(to_email: str, feedback_id: int, reply: str):
-    logger.info(
-        f"Sending feedback reply email feedback_id={feedback_id}"
-    )
+    logger.info(f"Sending feedback reply email feedback_id={feedback_id}")
 
     try:
         body = f"""
@@ -332,11 +324,7 @@ def send_feedback_reply_email(to_email: str, feedback_id: int, reply: str):
             server.login(get_email_user(), get_email_password())
             server.send_message(msg)
 
-        logger.info(
-            f"Feedback reply email sent feedback_id={feedback_id}"
-        )
+        logger.info(f"Feedback reply email sent feedback_id={feedback_id}")
 
     except Exception:
-        logger.exception(
-            f"Failed sending feedback reply email feedback_id={feedback_id}"
-        )
+        logger.exception(f"Failed sending feedback reply email feedback_id={feedback_id}")

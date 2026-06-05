@@ -1,8 +1,9 @@
 # app/middleware/ip_country.py
 
+from functools import lru_cache
+
 import requests
 from fastapi import Request
-from functools import lru_cache
 
 from app.core.config_manager import get_config
 from app.utils.logger_config import app_logger as logger
@@ -38,19 +39,13 @@ def get_ip_country(ip: str) -> str | None:
     try:
         url = f"https://api.ipinfo.io/lite/{ip}"
 
-        res = requests.get(
-            url,
-            params={"token": token},
-            timeout=2
-        )
+        res = requests.get(url, params={"token": token}, timeout=2)
 
         if res.status_code == 200:
             try:
                 data = res.json()
             except ValueError:
-                logger.warning(
-                    f"Invalid JSON from IPINFO ip={ip} body={res.text}"
-                )
+                logger.warning(f"Invalid JSON from IPINFO ip={ip} body={res.text}")
                 return None
 
             country = data.get("country_code")
@@ -59,9 +54,7 @@ def get_ip_country(ip: str) -> str | None:
 
             return country
 
-        logger.warning(
-            f"IPINFO returned status={res.status_code} ip={ip} body={res.text}"
-        )
+        logger.warning(f"IPINFO returned status={res.status_code} ip={ip} body={res.text}")
 
     except requests.RequestException:
         logger.exception(f"Network error while resolving ip={ip}")

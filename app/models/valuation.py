@@ -1,17 +1,17 @@
-#app/models/valuation.py
+# app/models/valuation.py
 
-from fastapi import Form   
-from typing import Optional 
 from datetime import datetime
-from sqlalchemy.sql import func
-from sqlalchemy.orm import deferred, relationship
-from pydantic import BaseModel, EmailStr
-from sqlalchemy import Column, String, DateTime, JSON, ForeignKey, Index
+from typing import Optional
 
+from fastapi import Form
+from pydantic import BaseModel, EmailStr
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Index, String
 from sqlalchemy.dialects.postgresql import UUID
-from app.database.mixins import UUIDPrimaryKeyMixin
+from sqlalchemy.orm import deferred, relationship
+from sqlalchemy.sql import func
 
 from app.database.db import Base
+from app.database.mixins import UUIDPrimaryKeyMixin
 
 
 class ValuationReport(UUIDPrimaryKeyMixin, Base):
@@ -20,20 +20,20 @@ class ValuationReport(UUIDPrimaryKeyMixin, Base):
         Index("ix_valuation_reports_user_created_at", "user_id", "created_at"),
         Index("ix_valuation_reports_country_created_at", "country_code", "created_at"),
     )
-    
+
     valuation_id = Column(String, unique=True, index=True, nullable=False)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
     user = relationship("User", lazy="selectin")
-    category = Column(String, nullable=False, index=True)    
-    country_code = Column(String, nullable=False, index=True)  
+    category = Column(String, nullable=False, index=True)
+    country_code = Column(String, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     user_fields = deferred(Column(JSON, nullable=False), group="valuation_payload")
     ai_response = deferred(Column(JSON, nullable=False), group="valuation_payload")
     subscription_id = Column(UUID(as_uuid=True), ForeignKey("user_subscriptions.id"), nullable=False, index=True)
     report_context = deferred(Column(JSON, nullable=False), group="valuation_payload")
-    
-    
-class ValuationJob(UUIDPrimaryKeyMixin,Base):
+
+
+class ValuationJob(UUIDPrimaryKeyMixin, Base):
     __tablename__ = "valuation_jobs"
     __table_args__ = (
         Index("ix_valuation_jobs_user_created_at", "user_id", "created_at"),
@@ -55,7 +55,6 @@ class ValuationJob(UUIDPrimaryKeyMixin,Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
 
-
 class DesktopValuationForm(BaseModel):
     country: str
     full_address: str
@@ -63,7 +62,7 @@ class DesktopValuationForm(BaseModel):
     land_area: Optional[str] = None
     built_up_area: Optional[str] = None
     year_built: Optional[str] = None
-    
+
     # last_sale_date: Optional[str] = None
     # last_sale_price: Optional[str] = None
     ownership_type: Optional[str] = None
@@ -78,8 +77,8 @@ class DesktopValuationForm(BaseModel):
     project_name: Optional[str] = None
     email: EmailStr
     contact_number: str
-    
-    
+
+
 def desktop_valuation_form_dep(
     country: str = Form(...),
     # city_location: str = Form(...),

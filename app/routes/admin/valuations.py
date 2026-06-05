@@ -1,32 +1,23 @@
 # app/router/admin/valuations.py
 
-from uuid import UUID
 from datetime import datetime
 from typing import Optional
-from sqlalchemy.orm import Session, undefer_group
-from sqlalchemy import or_
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
-
-from app.deps import get_db, require_management
-
-from app.models import User
-from app.models.valuation import ValuationReport
-
-from app.schemas import EmptyObject, ValuationDetailResponse, ValuationResponse
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, undefer_group
 
 from app.common import PaginatedResponse
-from app.deps import pagination_params
-
+from app.deps import get_db, pagination_params, require_management
+from app.models import User
+from app.models.valuation import ValuationReport
+from app.schemas import EmptyObject, ValuationDetailResponse, ValuationResponse
 from app.utils.date_filters import filter_by_date_range
+from app.utils.logger_config import app_logger as logger
 from app.utils.response import APIResponse, success_response
 
-from app.utils.logger_config import app_logger as logger
-
-
-router = APIRouter(
-    prefix="/admin",
-    tags=["admin-valuations"]
-)
+router = APIRouter(prefix="/admin", tags=["admin-valuations"])
 
 
 LIST_VALUATIONS_EXAMPLE = {
@@ -121,9 +112,7 @@ DELETE_VALUATION_EXAMPLE = {
 def list_valuations(
     db: Session = Depends(get_db),
     _: None = Depends(require_management),
-    
     params: dict = Depends(pagination_params),
-
     user_id: Optional[UUID] = Query(
         None,
         description="Filter valuations by the owning user's UUID.",
@@ -144,7 +133,6 @@ def list_valuations(
         None,
         description="Include valuations created at or before this UTC datetime.",
     ),
-    
     sort_by: str = Query(
         "created_at",
         description="Sort field. Allowed values: `created_at`, `valuation_id`, `category`, `country_code`.",
@@ -153,14 +141,13 @@ def list_valuations(
         "desc",
         description="Sort order. Allowed values: `asc` or `desc`.",
     ),
-
 ):
     logger.info(
         "Admin listing valuations "
         f"page={params['page']} limit={params['limit']} "
         f"search={params['search']} user_id={user_id}"
     )
-    
+
     query = db.query(
         ValuationReport.id,
         ValuationReport.valuation_id,
@@ -179,27 +166,23 @@ def list_valuations(
                 ValuationReport.country_code.ilike(f"%{params['search']}%"),
             )
         )
-    
+
     # 🔎 FILTERS
     if user_id:
         query = query.filter(ValuationReport.user_id == user_id)
 
     if country_code:
-        query = query.filter(
-            ValuationReport.country_code == country_code.upper()
-        )
+        query = query.filter(ValuationReport.country_code == country_code.upper())
 
     if category:
-        query = query.filter(
-            ValuationReport.category == category
-        )
+        query = query.filter(ValuationReport.category == category)
 
     query = filter_by_date_range(
-            query,
-            ValuationReport.created_at,
-            from_date,
-            to_date,
-        )
+        query,
+        ValuationReport.created_at,
+        from_date,
+        to_date,
+    )
 
     total = query.order_by(None).count()
 
@@ -223,18 +206,11 @@ def list_valuations(
 
     # 📄 PAGINATION
     if params["limit"] is not None:
-        valuations = (
-            query
-            .offset((params["page"] - 1) * params["limit"])
-            .limit(params["limit"])
-            .all()
-        )
+        valuations = query.offset((params["page"] - 1) * params["limit"]).limit(params["limit"]).all()
     else:
         valuations = query.all()
 
-    logger.debug(
-        f"Admin fetched valuations count={len(valuations)} total={total}"
-    )
+    logger.debug(f"Admin fetched valuations count={len(valuations)} total={total}")
 
     return success_response(
         data={
@@ -254,9 +230,9 @@ def list_valuations(
                 "page": params["page"],
                 "limit": params["limit"],
                 "total": total,
-            }
+            },
         },
-        message="Valuations fetched successfully"
+        message="Valuations fetched successfully",
     )
 
 
@@ -299,10 +275,7 @@ def get_valuation_details(
         logger.warning(f"Valuation not found valuation_id={valuation_id}")
         raise HTTPException(404, "Valuation not found")
 
-    return success_response(
-        data=valuation,
-        message="Valuation details fetched successfully"
-    )
+    return success_response(data=valuation, message="Valuation details fetched successfully")
 
 
 @router.get(
@@ -335,45 +308,34 @@ def get_user_valuations(
     ),
     db: Session = Depends(get_db),
     _: None = Depends(require_management),
-    params : dict = Depends(pagination_params),
+    params: dict = Depends(pagination_params),
 ):
-    
-    logger.info(
-        f"Admin fetching valuations user_id={user_id} "
-        f"page={params['page']}"
-    )
+
+    logger.info(f"Admin fetching valuations user_id={user_id} " f"page={params['page']}")
 
     user = db.get(User, user_id)
     if not user:
         logger.warning(f"User not found while fetching valuations user_id={user_id}")
         raise HTTPException(404, "User not found")
 
-    query = (
-        db.query(
-            ValuationReport.id,
-            ValuationReport.valuation_id,
-            ValuationReport.user_id,
-            ValuationReport.category,
-            ValuationReport.country_code,
-            ValuationReport.subscription_id,
-            ValuationReport.created_at,
-        )
-        .filter(ValuationReport.user_id == user_id)
-    )
+    query = db.query(
+        ValuationReport.id,
+        ValuationReport.valuation_id,
+        ValuationReport.user_id,
+        ValuationReport.category,
+        ValuationReport.country_code,
+        ValuationReport.subscription_id,
+        ValuationReport.created_at,
+    ).filter(ValuationReport.user_id == user_id)
 
     if params["search"]:
-        query = query.filter(
-            ValuationReport.valuation_id.ilike(
-                f"%{params['search']}%"
-            )
-        )
+        query = query.filter(ValuationReport.valuation_id.ilike(f"%{params['search']}%"))
 
     total = query.order_by(None).count()
 
     if params["limit"] is not None:
         valuations = (
-            query
-            .order_by(ValuationReport.created_at.desc())
+            query.order_by(ValuationReport.created_at.desc())
             .offset((params["page"] - 1) * params["limit"])
             .limit(params["limit"])
             .all()
@@ -399,9 +361,9 @@ def get_user_valuations(
                 "page": params["page"],
                 "limit": params["limit"],
                 "total": total,
-            }
+            },
         },
-        message="User valuations fetched successfully"
+        message="User valuations fetched successfully",
     )
 
 
@@ -430,10 +392,8 @@ def delete_valuation(
     _: None = Depends(require_management),
 ):
     logger.info(f"Admin deleting valuation valuation_id={valuation_id}")
-    
-    valuation = db.query(ValuationReport).filter(
-        ValuationReport.valuation_id == valuation_id
-    ).first()
+
+    valuation = db.query(ValuationReport).filter(ValuationReport.valuation_id == valuation_id).first()
 
     if not valuation:
         logger.warning(f"Valuation not found during delete valuation_id={valuation_id}")
@@ -446,10 +406,7 @@ def delete_valuation(
         db.rollback()
         logger.exception(f"Failed to delete valuation valuation_id={valuation_id}")
         raise HTTPException(500, "Deletion failed")
-    
+
     logger.info(f"Valuation deleted valuation_id={valuation_id}")
 
-    return success_response(
-        data={},
-        message="Valuation deleted successfully"
-    )
+    return success_response(data={}, message="Valuation deleted successfully")

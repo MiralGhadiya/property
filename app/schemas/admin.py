@@ -1,8 +1,9 @@
-#app/schemas/admin.py
+# app/schemas/admin.py
 
-from uuid import UUID
-from typing import Optional, List
 from datetime import datetime
+from typing import List, Optional
+from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 from typing_extensions import Literal
 
@@ -46,7 +47,7 @@ class AdminUserUpdate(BaseModel):
     email: Optional[EmailStr] = None
     mobile_number: Optional[str] = None
     role: Optional[str] = None
-    
+
 
 class AdminResetPassword(BaseModel):
     new_password: str
@@ -54,9 +55,7 @@ class AdminResetPassword(BaseModel):
 
 
 class AdminFeedbackAction(BaseModel):
-    status: Optional[
-        Literal["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]
-    ] = None
+    status: Optional[Literal["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]] = None
     reply: Optional[str] = None
     notify_user: bool = False
     admin_note: Optional[str] = None
@@ -79,15 +78,13 @@ class AdminInquiryResponse(BaseModel):
 
     created_at: datetime
 
-    model_config = {
-        "from_attributes": True  # IMPORTANT (Pydantic v2)
-    }
-    
+    model_config = {"from_attributes": True}  # IMPORTANT (Pydantic v2)
+
 
 class UpdateSubscriptionDuration(BaseModel):
     duration_days: int
-    
-    
+
+
 class CountryResponse(BaseModel):
     id: UUID
     name: str
@@ -97,8 +94,8 @@ class CountryResponse(BaseModel):
 
     class Config:
         from_attributes = True
-        
-        
+
+
 class SystemConfigCreate(BaseModel):
     config_key: str
     config_value: Optional[str]
@@ -121,11 +118,7 @@ class SystemConfigResponse(BaseModel):
 
 
 class EmptyObject(BaseModel):
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {}
-        }
-    )
+    model_config = ConfigDict(json_schema_extra={"example": {}})
 
 
 class DashboardOverviewUserStats(BaseModel):
@@ -357,9 +350,7 @@ class ValuationReportContextBlob(BaseModel):
             "example": {
                 "currency_code": "AED",
                 "future_outlook": [],
-                "property_maps": {
-                    "static_map_url": "https://maps.example/static-map"
-                },
+                "property_maps": {"static_map_url": "https://maps.example/static-map"},
             }
         },
     )

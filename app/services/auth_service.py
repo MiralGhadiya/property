@@ -1,10 +1,11 @@
-#app/services/aut_service.py
+# app/services/aut_service.py
 
-from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 from uuid import UUID
-from app.models import User, RefreshToken
 
+from sqlalchemy.orm import Session
+
+from app.models import RefreshToken, User
 from app.utils.logger_config import app_logger as logger
 
 
@@ -15,7 +16,7 @@ def store_refresh_token(
     expires_at: datetime,
 ):
     logger.debug(f"Storing refresh token user_id={user_id} expires_at={expires_at}")
-    
+
     token = RefreshToken(
         user_id=user_id,
         token_hash=token_hash,
@@ -32,11 +33,9 @@ def store_refresh_token(
 
 def revoke_all_refresh_tokens(db: Session, user_id: UUID):
     logger.info(f"Revoking all refresh tokens user_id={user_id}")
-    
+
     try:
-        db.query(RefreshToken).filter(
-            RefreshToken.user_id == user_id
-        ).update({"revoked": True})
+        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).update({"revoked": True})
         db.commit()
     except Exception:
         db.rollback()

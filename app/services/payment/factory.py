@@ -1,16 +1,12 @@
 # app/services/payment/factory.py
 
-from app.services.payment.razorpay_impl import RazorpayProvider
-from app.services.payment.paypal_impl import PayPalProvider
 from app.services.payment.payoneer_impl import PayoneerProvider
+from app.services.payment.paypal_impl import PayPalProvider
+from app.services.payment.razorpay_impl import RazorpayProvider
 
 
 class PaymentProviderFactory:
-    _providers = {
-        "RAZORPAY": RazorpayProvider,
-        "PAYPAL": PayPalProvider,
-        "PAYONEER": PayoneerProvider
-    }
+    _providers = {"RAZORPAY": RazorpayProvider, "PAYPAL": PayPalProvider, "PAYONEER": PayoneerProvider}
 
     @classmethod
     def get_provider(cls, name: str):

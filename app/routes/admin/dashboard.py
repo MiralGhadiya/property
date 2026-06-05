@@ -26,7 +26,6 @@ from app.schemas import (
 from app.utils.logger_config import app_logger as logger
 from app.utils.response import APIResponse, success_response
 
-
 router = APIRouter(
     prefix="/admin/dashboard",
     tags=["admin-dashboard"],
@@ -220,23 +219,15 @@ def dashboard_overview(
         logger.info("Admin dashboard: overview requested")
 
         def build_payload() -> dict:
-            user_totals = (
-                db.query(
-                    func.count(User.id).label("total"),
-                    func.count(User.id).filter(User.is_active.is_(True)).label("active"),
-                )
-                .one()
-            )
+            user_totals = db.query(
+                func.count(User.id).label("total"),
+                func.count(User.id).filter(User.is_active.is_(True)).label("active"),
+            ).one()
 
-            subscription_totals = (
-                db.query(
-                    func.count(UserSubscription.id).label("total"),
-                    func.count(UserSubscription.id)
-                    .filter(UserSubscription.is_active.is_(True))
-                    .label("active"),
-                )
-                .one()
-            )
+            subscription_totals = db.query(
+                func.count(UserSubscription.id).label("total"),
+                func.count(UserSubscription.id).filter(UserSubscription.is_active.is_(True)).label("active"),
+            ).one()
 
             total_valuations = db.query(func.count(ValuationReport.id)).scalar() or 0
 
@@ -291,23 +282,12 @@ def dashboard_users(
 
         def build_payload() -> dict:
             last_30_days = _utc_now() - timedelta(days=30)
-            stats = (
-                db.query(
-                    func.count(User.id)
-                    .filter(User.is_email_verified.is_(True))
-                    .label("verified"),
-                    func.count(User.id)
-                    .filter(User.is_email_verified.is_(False))
-                    .label("unverified"),
-                    func.count(User.id)
-                    .filter(User.is_active.is_(False))
-                    .label("inactive"),
-                    func.count(User.id)
-                    .filter(User.email_verified_at >= last_30_days)
-                    .label("new_users_30d"),
-                )
-                .one()
-            )
+            stats = db.query(
+                func.count(User.id).filter(User.is_email_verified.is_(True)).label("verified"),
+                func.count(User.id).filter(User.is_email_verified.is_(False)).label("unverified"),
+                func.count(User.id).filter(User.is_active.is_(False)).label("inactive"),
+                func.count(User.id).filter(User.email_verified_at >= last_30_days).label("new_users_30d"),
+            ).one()
 
             logger.debug("Admin dashboard: users stats aggregation completed")
 
@@ -349,6 +329,7 @@ def user_registrations_by_last_five_years(
     _: None = Depends(require_management),
 ):
     try:
+
         def build_payload() -> dict:
             current_year = _utc_now().year
             window_start = datetime(current_year - 4, 1, 1, tzinfo=timezone.utc)
@@ -370,22 +351,17 @@ def user_registrations_by_last_five_years(
                 .all()
             )
 
-            year_data = {
-                year: 0 for year in range(current_year - 4, current_year + 1)
-            }
+            year_data = {year: 0 for year in range(current_year - 4, current_year + 1)}
 
             for year, total in results:
                 if year is not None:
                     year_data[int(year)] = total
 
             user_data_by_year = [
-                {"year": year, "registrations": year_data[year]}
-                for year in range(current_year - 4, current_year + 1)
+                {"year": year, "registrations": year_data[year]} for year in range(current_year - 4, current_year + 1)
             ]
 
-            logger.debug(
-                "Admin dashboard: user registrations by year aggregation completed"
-            )
+            logger.debug("Admin dashboard: user registrations by year aggregation completed")
 
             return {"user_registrations_by_year": user_data_by_year}
 
@@ -403,9 +379,7 @@ def user_registrations_by_last_five_years(
     "/subscriptions",
     response_model=APIResponse[list[DashboardSubscriptionBreakdownItem]],
     summary="Get subscription breakdown",
-    description=(
-        "Returns subscription totals and derived revenue grouped by plan and plan country."
-    ),
+    description=("Returns subscription totals and derived revenue grouped by plan and plan country."),
     responses={
         200: {
             "description": "Subscription and revenue breakdown.",
@@ -432,9 +406,7 @@ def dashboard_subscriptions_country_wise(
                     SubscriptionPlan.currency,
                     SubscriptionPlan.price,
                     func.count(UserSubscription.id).label("total"),
-                    func.count(UserSubscription.id)
-                    .filter(UserSubscription.is_active.is_(True))
-                    .label("active"),
+                    func.count(UserSubscription.id).filter(UserSubscription.is_active.is_(True)).label("active"),
                 )
                 .outerjoin(UserSubscription, SubscriptionPlan.id == UserSubscription.plan_id)
                 .group_by(
@@ -516,19 +488,14 @@ def dashboard_valuations(
 
             last_30_days = _utc_now() - timedelta(days=30)
             last_30d_count = (
-                db.query(func.count(ValuationReport.id))
-                .filter(ValuationReport.created_at >= last_30_days)
-                .scalar()
+                db.query(func.count(ValuationReport.id)).filter(ValuationReport.created_at >= last_30_days).scalar()
                 or 0
             )
 
             logger.debug("Admin dashboard: valuation aggregation completed")
 
             return {
-                "by_category": [
-                    {"category": category, "count": count}
-                    for category, count in by_category
-                ],
+                "by_category": [{"category": category, "count": count} for category, count in by_category],
                 "last_30_days": last_30d_count,
             }
 
@@ -546,9 +513,7 @@ def dashboard_valuations(
     "/countries",
     response_model=APIResponse[DashboardCountriesResponse],
     summary="Get country-wise dashboard stats",
-    description=(
-        "Returns country-level counts for subscriptions and valuations shown on the admin dashboard."
-    ),
+    description=("Returns country-level counts for subscriptions and valuations shown on the admin dashboard."),
     responses={
         200: {
             "description": "Country-wise subscription and valuation counts.",
@@ -591,14 +556,8 @@ def dashboard_countries(
             logger.debug("Admin dashboard: country-wise aggregation completed")
 
             return {
-                "subscriptions": [
-                    {"country": country, "count": count}
-                    for country, count in subs_by_country
-                ],
-                "valuations": [
-                    {"country": country, "count": count}
-                    for country, count in valuations_by_country
-                ],
+                "subscriptions": [{"country": country, "count": count} for country, count in subs_by_country],
+                "valuations": [{"country": country, "count": count} for country, count in valuations_by_country],
             }
 
         return _cached_dashboard_response(
@@ -632,28 +591,18 @@ def feedback_stats(
     _: None = Depends(require_management),
 ):
     try:
+
         def build_payload() -> dict:
-            stats = (
-                db.query(
-                    func.count(Feedback.id).label("total"),
-                    func.count(Feedback.id)
-                    .filter(Feedback.status == "OPEN")
-                    .label("open_count"),
-                    func.avg(Feedback.rating)
-                    .filter(Feedback.rating.isnot(None))
-                    .label("avg_rating"),
-                )
-                .one()
-            )
+            stats = db.query(
+                func.count(Feedback.id).label("total"),
+                func.count(Feedback.id).filter(Feedback.status == "OPEN").label("open_count"),
+                func.avg(Feedback.rating).filter(Feedback.rating.isnot(None)).label("avg_rating"),
+            ).one()
 
             return {
                 "total_feedback": stats.total,
                 "open_feedback": stats.open_count,
-                "avg_rating": (
-                    round(float(stats.avg_rating), 2)
-                    if stats.avg_rating is not None
-                    else None
-                ),
+                "avg_rating": (round(float(stats.avg_rating), 2) if stats.avg_rating is not None else None),
             }
 
         return _cached_dashboard_response(

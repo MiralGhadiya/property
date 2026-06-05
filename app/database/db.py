@@ -4,11 +4,12 @@ from urllib.parse import quote_plus
 
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 from app.utils.logger_config import app_logger as logger
 
 load_dotenv()
+
 
 def normalize_database_url(database_url: str) -> str:
     normalized_url = database_url.strip().strip('"').strip("'")
@@ -20,10 +21,7 @@ def normalize_database_url(database_url: str) -> str:
             1,
         )
 
-    if (
-        normalized_url.startswith("postgresql://")
-        and "+psycopg2" not in normalized_url
-    ):
+    if normalized_url.startswith("postgresql://") and "+psycopg2" not in normalized_url:
         return normalized_url.replace(
             "postgresql://",
             "postgresql+psycopg2://",
@@ -112,6 +110,7 @@ SessionLocal = sessionmaker(
 )
 
 Base = declarative_base()
+
 
 def get_db():
     db = SessionLocal()

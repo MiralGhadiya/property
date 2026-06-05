@@ -1,10 +1,13 @@
 # app/models/staff.py
 
-from sqlalchemy import Column, String, Boolean, ForeignKey
-from sqlalchemy.orm import relationship
-from app.database.db import Base
-from sqlalchemy.dialects.postgresql import UUID
 import uuid
+
+from sqlalchemy import Boolean, Column, ForeignKey, String
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
+from app.database.db import Base
+
 
 class Staff(Base):
     __tablename__ = "staff"
@@ -15,7 +18,7 @@ class Staff(Base):
     email = Column(String, unique=True, nullable=False)
     phone = Column(String, nullable=False)
     password = Column(String, nullable=False)
-    
+
     can_access_user = Column(Boolean, default=False)  # User Access
     can_access_staff = Column(Boolean, default=False)  # Staff Access
     can_access_dashboard = Column(Boolean, default=False)  # Dashboard Access

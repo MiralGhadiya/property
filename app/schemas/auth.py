@@ -44,4 +44,3 @@ class AppleLogin(BaseModel):
     id_token: str
     email: str | None = None
     name: str | None = None
-
