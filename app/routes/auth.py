@@ -599,6 +599,15 @@ def apple_login(
                 )
             country_id = country.id
 
+        if country_id is None:
+            country = country_service.get_country_by_name(db, "India")
+            if not country:
+                country = country_service.get_country_by_country_code(db, "IN")
+
+            if country:
+                logger.info(f"Defaulting Apple login country to India: {country}")
+                country_id = country.id
+
     if not user:
         # If frontend sent name details, prioritize it, otherwise default
         name = data.name or payload.get("name") or email.split("@")[0]
