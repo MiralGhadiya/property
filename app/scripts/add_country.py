@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.database.db import SessionLocal
 from app.models.country import Country
+from app.utils.logger_config import app_logger as logger
 
 
 def import_countries(csv_path: str):
@@ -41,6 +42,7 @@ def import_countries(csv_path: str):
 
     except Exception as e:
         db.rollback()
+        logger.exception("Error importing countries")
         print("Error importing countries:", str(e))
 
     finally:

@@ -10,7 +10,7 @@ from sqlalchemy.sql.elements import ColumnElement
 # ---------- STEP 1: NORMALIZATION ----------
 
 
-def to_utc(dt: Optional[datetime]) -> Optional[datetime]:
+def to_utc(dt: Optional[datetime] = None) -> Optional[datetime]:
     if dt is None:
         return None
 
@@ -21,8 +21,8 @@ def to_utc(dt: Optional[datetime]) -> Optional[datetime]:
 
 
 def normalize_date_range(
-    from_date: Optional[datetime],
-    to_date: Optional[datetime],
+    from_date: Optional[datetime] = None,
+    to_date: Optional[datetime] = None,
 ):
     from_dt = to_utc(from_date)
     to_dt = to_utc(to_date)
@@ -43,8 +43,8 @@ def normalize_date_range(
 def apply_date_range(
     query: Query,
     column: ColumnElement,
-    from_date: Optional[datetime],
-    to_date: Optional[datetime],
+    from_date: Optional[datetime] = None,
+    to_date: Optional[datetime] = None,
 ):
     if from_date:
         query = query.filter(column >= from_date)
@@ -61,8 +61,8 @@ def apply_date_range(
 def filter_by_date_range(
     query: Query,
     column: ColumnElement,
-    from_date: Optional[datetime],
-    to_date: Optional[datetime],
+    from_date: Optional[datetime] = None,
+    to_date: Optional[datetime] = None,
 ):
     from_dt, to_dt = normalize_date_range(from_date, to_date)
     return apply_date_range(query, column, from_dt, to_dt)

@@ -3,6 +3,7 @@
 from babel.numbers import get_territory_currencies
 
 from app.services.exchange_rate_service import get_rate
+from app.utils.logger_config import app_logger as logger
 
 
 def resolve_currency(db, country_code: str | None, profile_currency: str | None = None):
@@ -29,8 +30,12 @@ def resolve_currency(db, country_code: str | None, profile_currency: str | None 
                 rate = get_rate(db, currency)
                 if rate:
                     return currency, rate
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning(
+                "Currency lookup failed for country_code=%s, defaulting to USD",
+                country_code,
+                exc_info=True,
+            )
 
     # 3️⃣ Fallback
     return "USD", None

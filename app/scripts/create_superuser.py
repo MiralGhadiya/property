@@ -6,6 +6,7 @@ from app.auth import pwd_context
 from app.database.db import SessionLocal
 from app.models import Country, User
 from app.utils.phone import get_country_from_mobile
+from app.utils.logger_config import app_logger as logger
 
 load_dotenv()
 
@@ -61,6 +62,7 @@ def create_superuser():
 
     except Exception as e:
         db.rollback()
+        logger.exception("Failed to create superuser")
         print("Failed to create superuser:", e)
 
     finally:

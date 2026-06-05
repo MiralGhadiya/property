@@ -7,6 +7,8 @@ from urllib.parse import urlparse, urlunparse
 import redis
 from dotenv import load_dotenv
 
+from app.utils.logger_config import app_logger as logger
+
 load_dotenv()
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
@@ -26,7 +28,7 @@ try:
                 netloc = auth + netloc
             parsed = parsed._replace(netloc=netloc)
             REDIS_URL = urlunparse(parsed)
-except Exception:
-    pass
+except Exception as exc:
+    logger.warning("Redis hostname resolution failed, using REDIS_URL fallback", exc_info=True)
 
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)
