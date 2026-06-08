@@ -39,6 +39,11 @@ def build_database_url_from_parts() -> str | None:
     if not all([host, database, username]):
         return None
 
+    # mypy: ensure non-None types for subsequent operations
+    assert username is not None
+    assert host is not None
+    assert database is not None
+
     port = os.getenv("POSTGRES_PORT", "5432")
     password = os.getenv("POSTGRES_PASSWORD")
     auth = quote_plus(username)
