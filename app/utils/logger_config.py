@@ -183,7 +183,7 @@ class DailyFileHandler(logging.Handler):
         except OSError:
             return
 
-        for log_file in log_files[self.backup_count :]:
+        for log_file in log_files[self.backup_count:]:
             try:
                 log_file.unlink()
             except OSError:

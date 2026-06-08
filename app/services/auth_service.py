@@ -49,9 +49,9 @@ def logout_user(db: Session, user_id: UUID):
     logger.info(f"Logging out user user_id={user_id}")
 
     try:
-        user = db.query(User).filter(User.id == user_id).first()
-        # if user:
-        #     user.is_active = False
+        _ = db.query(User).filter(User.id == user_id).first()
+        # if _:
+        #     _.is_active = False
 
         revoke_all_refresh_tokens(db, user_id)
         db.commit()

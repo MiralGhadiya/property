@@ -30,7 +30,7 @@ def resolve_currency(db, country_code: str | None, profile_currency: str | None 
                 rate = get_rate(db, currency)
                 if rate:
                     return currency, rate
-        except Exception as exc:
+        except Exception:
             logger.warning(
                 "Currency lookup failed for country_code=%s, defaulting to USD",
                 country_code,

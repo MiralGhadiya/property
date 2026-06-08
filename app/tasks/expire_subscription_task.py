@@ -22,7 +22,7 @@ def process_autopay_renewals(db: Session):
     for sub in subs:
         try:
             sub.end_date += timedelta(days=30)
-        except Exception as exc:
+        except Exception:
             logger.exception("Failed to auto-renew subscription %s", sub.id)
             sub.auto_renew = False
             sub.is_active = False

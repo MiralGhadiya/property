@@ -4,7 +4,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
-import app.celery_app as celery_app
+import importlib
+importlib.import_module("app.celery_app")
 from app.core.config_manager import load_config, start_listener_thread
 from app.middleware.ip_country import get_client_ip
 from app.middleware.ip_country_middleware import IPCountryMiddleware

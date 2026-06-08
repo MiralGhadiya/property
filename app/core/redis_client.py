@@ -28,7 +28,7 @@ try:
                 netloc = auth + netloc
             parsed = parsed._replace(netloc=netloc)
             REDIS_URL = urlunparse(parsed)
-except Exception as exc:
+except Exception:
     logger.warning("Redis hostname resolution failed, using REDIS_URL fallback", exc_info=True)
 
 redis_client = redis.from_url(REDIS_URL, decode_responses=True)

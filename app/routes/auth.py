@@ -713,7 +713,7 @@ def apple_callback(
                 first_name = name_data.get("firstName", "")
                 last_name = name_data.get("lastName", "")
                 name = f"{first_name} {last_name}".strip()
-            except Exception as exc:
+            except Exception:
                 logger.warning(
                     "Failed to parse Apple user payload, using fallback name",
                     exc_info=True,
