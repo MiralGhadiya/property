@@ -7,24 +7,50 @@ import google.generativeai as genai
 
 from app.utils.logger_config import app_logger as logger
 
-logger.info("Initializing Gemini client")
+logger.info("Gemini client module loaded (lazy init)")
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    logger.error("GEMINI_API_KEY is not set")
-    raise RuntimeError("Missing GEMINI_API_KEY")
+# Lazy client/model initialization to avoid import-time failures when
+# GEMINI_API_KEY is not present in some environments (e.g., local dev without keys).
+_gemini_model = None
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash")
 
-logger.info("Gemini API configured successfully")
-logger.debug(f"Gemini model loaded: {model}")
+def _get_gemini_model():
+    global _gemini_model
+
+    if _gemini_model is not None:
+        return _gemini_model
+
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    if not GEMINI_API_KEY:
+        logger.error("GEMINI_API_KEY is not set")
+        raise RuntimeError("Missing GEMINI_API_KEY")
+
+    genai.configure(api_key=GEMINI_API_KEY)
+    _gemini_model = genai.GenerativeModel("gemini-2.5-flash")
+
+    logger.info("Gemini API configured successfully")
+    logger.debug(f"Gemini model loaded: {_gemini_model}")
+
+    return _gemini_model
 
 
 def generate_valuation_summary(form_data: dict):
     logger.info("Starting Gemini valuation summary generation")
 
     try:
+        # Safely parse numeric-ish fields from form_data
+        def _safe_int_from_field(value, default=0):
+            try:
+                if value is None:
+                    return default
+                return int(str(value).split()[0])
+            except Exception:
+                return default
+
+        land_area_sqft = _safe_int_from_field(form_data.get("land_area"))
+        built_up_area_sqft = _safe_int_from_field(form_data.get("built_up_area"))
+        year_built_val = _safe_int_from_field(form_data.get("year_built"))
+
         prompt = f"""
         You are an Automated Valuation Model (AVM).
         Return ONLY valid JSON. DO NOT include explanations.
@@ -35,9 +61,9 @@ def generate_valuation_summary(form_data: dict):
               "city": "{form_data.get("city_location")}",
               "country": "{form_data.get("country")}",
               "property_type": "{form_data.get("property_type")}",
-              "land_area_sqft": {int(form_data.get("land_area").split()[0])},
-              "built_up_area_sqft": {int(form_data.get("built_up_area").split()[0])},
-              "age_years": {int(form_data.get("year_built"))}
+              "land_area_sqft": {land_area_sqft},
+              "built_up_area_sqft": {built_up_area_sqft},
+              "age_years": {year_built_val}
           }},
           "predicted_value": {{
               "low_value": 0,
@@ -74,6 +100,7 @@ def generate_valuation_summary(form_data: dict):
         Return ONLY JSON.
         """
 
+        model = _get_gemini_model()
         response = model.generate_content(prompt)
         raw = response.text.strip()
 

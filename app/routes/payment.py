@@ -2,15 +2,13 @@
 
 from datetime import datetime, timezone
 from uuid import UUID
-
-import razorpay
 from dateutil.relativedelta import relativedelta
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException, Request
 from razorpay.errors import SignatureVerificationError
 from sqlalchemy.orm import Session
 
-from app.core.config_manager import get_config
+from app.services.payment.razorpay_impl import get_razorpay_client
 from app.deps import get_current_user, get_db
 from app.models import SubscriptionPlan, User, UserSubscription
 from app.models.subscription_settings import SubscriptionSettings
@@ -18,24 +16,6 @@ from app.services.exchange_rate_service import get_rate
 from app.utils.logger_config import app_logger as logger
 
 load_dotenv()
-
-# RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
-# RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
-
-
-def get_razorpay_client():
-    key_id = get_config("RAZORPAY_KEY_ID")
-    key_secret = get_config("RAZORPAY_KEY_SECRET")
-
-    if not key_id or not key_secret:
-        raise RuntimeError("Missing Razorpay credentials")
-
-    return razorpay.Client(auth=(key_id, key_secret))
-
-
-# if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
-#     logger.error("RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET is not set")
-#     raise RuntimeError("Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET")
 
 router = APIRouter(prefix="/payment", tags=["payment"])
 

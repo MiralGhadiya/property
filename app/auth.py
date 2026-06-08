@@ -19,7 +19,7 @@ def get_secret_key():
 
     if not key:
         logger.error("JWT_SECRET_KEY is not set")
-        raise RuntimeError("SECRET_KEY is not set")
+        raise RuntimeError("JWT_SECRET_KEY is not set")
 
     return key
 

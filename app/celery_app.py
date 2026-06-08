@@ -4,11 +4,13 @@ from celery import Celery
 from celery.schedules import crontab
 from dotenv import load_dotenv
 
+# Ensure environment variables are loaded before attempting to load config
+load_dotenv()
+
 from app.core.config_manager import load_config
 
+# Load DB-backed configuration into Redis (rate-limited inside)
 load_config()
-
-load_dotenv()
 
 from app.core.redis_client import REDIS_URL
 
