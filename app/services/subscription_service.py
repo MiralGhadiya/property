@@ -596,11 +596,7 @@ def add_subscription_plans_from_excel(
 
         if excel_global_plan:
             if existing_global:
-                logger.info("[GLOBAL] Updating existing GLOBAL plan")
-                existing_global.price = excel_global_plan["price"]
-                existing_global.currency = excel_global_plan["currency"]
-                existing_global.max_reports = excel_global_plan["max_reports"]
-                existing_global.is_active = True
+                logger.info("[GLOBAL] Skipping existing GLOBAL plan")
             else:
                 logger.info("[GLOBAL] Creating new GLOBAL plan")
                 global_plan = SubscriptionPlan(
